@@ -1,6 +1,6 @@
 {
-  "pushed_at": 1778765870.2620294,
-  "pushed_at_human": "2026-05-14 13:37:50 UTC",
-  "reason": "analysis:sample_continuity_of_car",
-  "size_bytes": 9233
+  "pushed_at": 1778765961.381569,
+  "pushed_at_human": "2026-05-14 13:39:21 UTC",
+  "reason": "compare:sample_continuit->sample_continuit",
+  "size_bytes": 9747
 }
