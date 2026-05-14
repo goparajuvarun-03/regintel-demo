@@ -20,6 +20,7 @@ import sqlite3
 import tarfile
 import time
 import uuid
+import html as _html_module
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,16 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
+
+
+def _esc(value) -> str:
+    """HTML-escape any value before embedding it in a markdown(..., unsafe_allow_html=True) block.
+    Use this for every piece of LLM- or user-derived text that gets interpolated into HTML markup.
+    Without this, characters like < > & in regulatory text (e.g. 'members aged < 65') get
+    parsed as malformed HTML tags and either disappear or render as visible broken markup."""
+    if value is None:
+        return ""
+    return _html_module.escape(str(value), quote=True)
 
 # ============================================================
 # Page config — must be first Streamlit call
@@ -1965,11 +1976,11 @@ def page_impact():
         st.markdown(f"""
 <div class="pane">
   <div class="pane-head">
-    <span class="pane-title">{target['title']}</span>
-    <span class="pane-sub">Effective: {target.get('effective_date') or '—'}</span>
+    <span class="pane-title">{_esc(target.get('title', ''))}</span>
+    <span class="pane-sub">Effective: {_esc(target.get('effective_date') or '—')}</span>
   </div>
   <div class="pane-body" style="font-size:14px; color:var(--ink-2); line-height:1.6;">
-    {res.get('regulation_summary') or '<i>No summary available.</i>'}
+    {_esc(res.get('regulation_summary') or '') or '<i>No summary available.</i>'}
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -2024,10 +2035,10 @@ def page_impact():
 
     for i, ia in enumerate(impacts):
         prio = ia.get("priority", "Low")
-        band_cls = {"High": "", "Medium": "med", "Low": "lo"}[prio]
+        band_cls = {"High": "", "Medium": "med", "Low": "lo"}.get(prio, "med")
         conf = float(ia.get("confidence_score", 0))
         conf_cls = "" if prio == "High" else "med"
-        cite_html = " ".join(f'<span class="cite">{c}</span>'
+        cite_html = " ".join(f'<span class="cite">{_esc(c)}</span>'
                             for c in (ia.get("supporting_citations") or []))
 
         st.markdown(f"""
@@ -2036,14 +2047,14 @@ def page_impact():
   <div class="header-strip">
     {kind_pill(ia.get('type', 'Policy').lower())}
     {priority_pill(prio)}
-    <span style="margin-left:auto; font-family:'Source Code Pro',monospace; font-size:11px; color:var(--ink-mute);">{ia.get('name','')[:32]}</span>
+    <span style="margin-left:auto; font-family:'Source Code Pro',monospace; font-size:11px; color:var(--ink-mute);">{_esc(ia.get('name',''))[:32]}</span>
   </div>
-  <div class="name">{ia.get('name','Unnamed')}</div>
-  <div class="id">{ia.get('type','—')}</div>
+  <div class="name">{_esc(ia.get('name','Unnamed'))}</div>
+  <div class="id">{_esc(ia.get('type','—'))}</div>
   <div class="body">
-    <p>{ia.get('impact_reason','')}</p>
-    <div class="info-line"><span class="lbl">Action</span><span>{ia.get('recommended_action','—')}</span></div>
-    <div class="info-line"><span class="lbl">Risk if delayed</span><span>{ia.get('risk_if_not_implemented','—')}</span></div>
+    <p>{_esc(ia.get('impact_reason',''))}</p>
+    <div class="info-line"><span class="lbl">Action</span><span>{_esc(ia.get('recommended_action','—'))}</span></div>
+    <div class="info-line"><span class="lbl">Risk if delayed</span><span>{_esc(ia.get('risk_if_not_implemented','—'))}</span></div>
     <div class="info-line"><span class="lbl">Citations</span><span class="citations">{cite_html or '<span style="color:var(--ink-mute);">none</span>'}</span></div>
   </div>
   <div class="conf-row">
@@ -2163,7 +2174,7 @@ def page_impact():
                         f"<div style='background:#FBE7EC; padding:12px 14px; "
                         f"border-radius:6px; font-style:italic; color:#7A1A33; "
                         f"font-size:13.5px; line-height:1.5; margin-bottom:14px;'>"
-                        f"{draft['current_text_assumption']}"
+                        f"{_esc(draft['current_text_assumption'])}"
                         f"</div>", unsafe_allow_html=True)
 
                     # Section 2: REPLACE WITH (proposed text, green) — IN A COPYABLE CODE BLOCK
@@ -2173,6 +2184,7 @@ def page_impact():
                         "2 · REPLACE WITH THIS TEXT (click the copy icon to copy)"
                         "</div>", unsafe_allow_html=True)
                     # st.code provides a built-in copy button in Streamlit
+                    # st.code handles text safely — no escape needed here
                     st.code(draft['proposed_text'], language=None)
 
                     # Section 3: RATIONALE
@@ -2185,7 +2197,7 @@ def page_impact():
                         f"<div style='background:#F6F8FB; padding:12px 14px; "
                         f"border-radius:6px; color:#1C2940; font-size:13px; "
                         f"line-height:1.5; margin-bottom:14px;'>"
-                        f"{draft['rationale']}"
+                        f"{_esc(draft['rationale'])}"
                         f"</div>", unsafe_allow_html=True)
 
                     # Section 4: SECTION REFERENCE — pill
@@ -2198,7 +2210,7 @@ def page_impact():
                         f"color:#02C39A; padding:6px 14px; border-radius:4px; "
                         f"font-family:Consolas, monospace; font-size:13px; "
                         f"font-weight:600; margin-bottom:14px;'>"
-                        f"{draft['section_reference']}"
+                        f"{_esc(draft['section_reference'])}"
                         f"</div>", unsafe_allow_html=True)
 
                     if st.button("↻ Regenerate proposed text", key=f"regen_propose_{i}"):
@@ -2214,12 +2226,12 @@ def page_impact():
             unsafe_allow_html=True)
         for c in cites[:8]:
             with st.expander(
-                f"[{c['citation_id']}] {c['source_title']} · "
-                f"{c.get('section') or 'n/a'} · relevance {c['relevance']:.2f}"):
+                f"[{c.get('citation_id', '?')}] {c.get('source_title', '')} · "
+                f"{c.get('section') or 'n/a'} · relevance {float(c.get('relevance', 0)):.2f}"):
                 st.markdown(
                     f'<div style="background:var(--slate-bg); padding:12px 14px; '
                     f'border-radius:6px; font-size:13px; '
-                    f'border-left:3px solid var(--teal);">{c["snippet"]}</div>',
+                    f'border-left:3px solid var(--teal); white-space:pre-wrap;">{_esc(c.get("snippet", ""))}</div>',
                     unsafe_allow_html=True)
 
 
@@ -2284,10 +2296,10 @@ def page_compare():
 <div class="pane" style="border-left: 4px solid var(--teal);">
   <div class="pane-head">
     <span class="pane-title">AI-generated summary</span>
-    <span class="pane-sub">{res.get('old_version')} ⇄ {res.get('new_version')}</span>
+    <span class="pane-sub">{_esc(res.get('old_version', ''))} ⇄ {_esc(res.get('new_version', ''))}</span>
   </div>
   <div class="pane-body" style="font-size:14px; color:var(--ink-2); line-height:1.6;">
-    {res.get('summary', '')}
+    {_esc(res.get('summary', ''))}
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -2320,12 +2332,13 @@ def page_compare():
 
     for c in res["changes"]:
         badge = {"Added": "diff-added", "Removed": "diff-removed",
-                "Modified": "diff-modified"}[c["type"]]
+                "Modified": "diff-modified"}.get(c.get("type"), "diff-modified")
 
         # Determine display layout based on change type
         ctype_lower = (c.get("type") or "").strip().lower()
-        old_text = (c.get("old_text") or "")[:600]
-        new_text = (c.get("new_text") or "")[:600]
+        # HTML-escape all LLM-sourced text before embedding in markup
+        old_text_esc = _esc((c.get("old_text") or "")[:600])
+        new_text_esc = _esc((c.get("new_text") or "")[:600])
 
         if ctype_lower == "added":
             # Only show the new content with an "ADDED" badge — no Old column
@@ -2336,7 +2349,7 @@ def page_compare():
                   padding: 3px 10px; border-radius: 3px; margin-bottom: 8px;">
         + ADDED IN THIS VERSION
       </div>
-      <div class="diff-added">{new_text or '<i style="color:#5a6783;">No text supplied by model.</i>'}</div>
+      <div class="diff-added">{new_text_esc or '<i style="color:#5a6783;">No text supplied by model.</i>'}</div>
     </div>
 """
         elif ctype_lower == "removed":
@@ -2348,16 +2361,16 @@ def page_compare():
                   padding: 3px 10px; border-radius: 3px; margin-bottom: 8px;">
         − REMOVED IN THIS VERSION
       </div>
-      <div class="diff-removed">{old_text or '<i style="color:#5a6783;">No text supplied by model.</i>'}</div>
+      <div class="diff-removed">{old_text_esc or '<i style="color:#5a6783;">No text supplied by model.</i>'}</div>
     </div>
 """
         else:
             # Modified — side-by-side
-            old_html = (f'<div class="diff-removed">{old_text}</div>'
-                       if old_text else
+            old_html = (f'<div class="diff-removed">{old_text_esc}</div>'
+                       if old_text_esc else
                        '<div style="color:var(--ink-mute); font-size:13px;">—</div>')
-            new_html = (f'<div class="diff-added">{new_text}</div>'
-                       if new_text else
+            new_html = (f'<div class="diff-added">{new_text_esc}</div>'
+                       if new_text_esc else
                        '<div style="color:var(--ink-mute); font-size:13px;">—</div>')
             change_body = f"""
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:10px 0;">
@@ -2375,14 +2388,14 @@ def page_compare():
         st.markdown(f"""
 <div class="pane">
   <div class="pane-head">
-    <span class="pane-title">{c['type']} · {c['section']}</span>
-    <span class="pane-sub">Compliance: {c['compliance_risk_delta']} · Operational: {c['operational_impact_delta']}</span>
+    <span class="pane-title">{_esc(c.get('type', ''))} · {_esc(c.get('section', ''))}</span>
+    <span class="pane-sub">Compliance: {_esc(c.get('compliance_risk_delta', '—'))} · Operational: {_esc(c.get('operational_impact_delta', '—'))}</span>
   </div>
   <div class="pane-body">
-    <div class="{badge}" style="margin-bottom:10px;"><b>{c['type']}</b><br>{c['description']}</div>
+    <div class="{badge}" style="margin-bottom:10px;"><b>{_esc(c.get('type', ''))}</b><br>{_esc(c.get('description', ''))}</div>
     {change_body}
-    <div class="info-line"><span class="lbl">Impact</span><span>{c['impact']}</span></div>
-    <div class="info-line"><span class="lbl">Action</span><span>{c['recommended_action']}</span></div>
+    <div class="info-line"><span class="lbl">Impact</span><span>{_esc(c.get('impact', ''))}</span></div>
+    <div class="info-line"><span class="lbl">Action</span><span>{_esc(c.get('recommended_action', ''))}</span></div>
   </div>
 </div>
 """, unsafe_allow_html=True)
