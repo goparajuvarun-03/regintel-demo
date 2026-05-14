@@ -1,0 +1,42 @@
+SAMPLE — CMS-MLN-12345 (MEDICARE LEARNING NETWORK ARTICLE)
+
+ICD-10-CM VALIDATION EDITS FOR PROFESSIONAL CLAIMS
+
+Issuing Body: Centers for Medicare & Medicaid Services (CMS)
+Document ID: CMS-MLN-12345
+Status: MLN Matters Article
+Effective Date: July 1, 2026
+
+This is SYNTHETIC SAMPLE CONTENT for demonstration purposes only.
+
+OVERVIEW
+
+Effective July 1, 2026, CMS will implement new ICD-10-CM validation
+edits for professional claims submitted to Medicare contractors. These
+edits will reject claims where the diagnosis code does not meet
+specificity requirements for the reported procedure.
+
+KEY CHANGES
+
+1. Diagnosis-procedure pairing edits will be enforced at the claim
+   level prior to adjudication.
+
+2. Claims with unspecified diagnosis codes (e.g., codes ending in .9)
+   will be rejected when used with procedure codes that require
+   higher specificity.
+
+3. Providers will receive remittance advice codes indicating the
+   specific edit triggered.
+
+PROVIDER IMPACT
+
+Providers should review their charge capture and coding workflows to
+ensure diagnosis codes are documented with the highest level of
+specificity. Practice management systems may need updates to flag
+unspecified codes prior to claim submission.
+
+PAYER IMPACT
+
+Medicare Advantage plans that mirror CMS edits will need to update
+their claims processing systems to reflect these new validation
+rules.

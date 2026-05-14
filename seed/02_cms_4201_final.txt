@@ -1,0 +1,64 @@
+SAMPLE — CMS-4201-F (FINAL RULE)
+
+CONTRACT YEAR 2026 POLICY AND TECHNICAL CHANGES TO THE
+MEDICARE ADVANTAGE PROGRAM, MEDICARE PRESCRIPTION DRUG
+BENEFIT PROGRAM, AND PROGRAMS OF ALL-INCLUSIVE CARE FOR
+THE ELDERLY (PACE) — FINAL RULE
+
+Issuing Body: Centers for Medicare & Medicaid Services (CMS)
+Document ID: CMS-4201-F
+Status: Final Rule
+Effective Date: January 15, 2026
+
+This is SYNTHETIC SAMPLE CONTENT for demonstration purposes only.
+Do not use for compliance decisions.
+
+§ 422.138(a) — Continuity of Care for Transitioning Members (REVISED)
+
+Plans must continue to honor prior authorization decisions made by
+another organization for a minimum of 90 days from the date the
+enrollee transitioned plans, and for the full duration of any
+clinically established treatment plan, whichever is longer.
+
+This represents a CHANGE from the proposed 30-day window. CMS
+determined the longer window better protects enrollee continuity of
+care during transitions and reduces administrative burden on
+treating providers.
+
+§ 422.138(b) — Denial Notice Requirements (NEW)
+
+Plans must issue a written denial notice that includes appeal rights
+and is delivered within timeframes consistent with adverse-determination
+notice rules under § 422.568. The notice must specifically state:
+
+  (1) the reason for the denial,
+  (2) the enrollee's appeal rights including expedited appeal options,
+  (3) information about external review.
+
+§ 422.138(c) — Quarterly Compliance Reporting (NEW)
+
+Plans must submit quarterly reports to CMS attesting to compliance
+with the continuity-of-care provisions of this section. Reports must
+use the prescribed reporting template and be submitted within 30 days
+of quarter-end.
+
+§ 422.138(d) — System Integration Requirements
+
+Plans must implement systems capable of receiving and processing
+prior authorization records from external Medicare Advantage
+organizations. Manual workarounds are permitted during a transition
+period but must be replaced by automated processes within 12 months
+of the effective date.
+
+REGULATORY IMPACT
+
+CMS estimates this final rule will affect approximately 30 million
+Medicare Advantage enrollees. The expanded 90-day continuity window,
+new notice requirements, and quarterly reporting obligations
+represent significant compliance and operational changes for plans.
+
+ENFORCEMENT
+
+CMP penalties under 42 CFR § 422.752 may apply for violations of
+the continuity-of-care provisions. CMS will conduct targeted audits
+of plan compliance during 2026.
