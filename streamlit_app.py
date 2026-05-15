@@ -566,8 +566,33 @@ def _fallback_keyword_search(query: str, kind: str | None,
 # ============================================================
 # LLM — Gemini with mock fallback
 # ============================================================
+# Track which LLM produced the last response so the UI can display it.
+# Set by call_llm() on every call. Cleared lazily.
+_LAST_LLM_SOURCE: dict = {"source": "unknown", "error": None}
+
+
+def _strip_json_fence(s: str) -> str:
+    """Gemini sometimes wraps JSON in markdown code fences even with response_mime_type set.
+    Strip ```json ... ``` or ``` ... ``` wrappers, plus leading/trailing whitespace."""
+    if not s:
+        return s
+    s = s.strip()
+    # ```json ... ```
+    if s.startswith("```"):
+        # Remove first fence line
+        first_newline = s.find("\n")
+        if first_newline > 0:
+            s = s[first_newline + 1:]
+        # Remove trailing fence
+        if s.rstrip().endswith("```"):
+            s = s.rstrip()[:-3].rstrip()
+    return s.strip()
+
+
 def call_llm(system: str, user: str, max_tokens: int = 1500) -> dict:
-    """Returns a JSON dict. Falls back to mock if Gemini unavailable."""
+    """Returns a JSON dict. Falls back to mock if Gemini unavailable.
+    Sets _LAST_LLM_SOURCE so the UI can show which model actually responded."""
+    global _LAST_LLM_SOURCE
     if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
         try:
             import google.generativeai as genai
@@ -584,10 +609,31 @@ def call_llm(system: str, user: str, max_tokens: int = 1500) -> dict:
                     "response_mime_type": "application/json",
                 },
             )
-            return json.loads(resp.text)
+            raw = (resp.text or "").strip()
+            if not raw:
+                raise ValueError("Gemini returned empty response (possibly safety-filtered)")
+            # Tolerant parse — strip code fences if present
+            cleaned = _strip_json_fence(raw)
+            try:
+                parsed = json.loads(cleaned)
+            except json.JSONDecodeError:
+                # Sometimes Gemini emits trailing prose after the JSON object.
+                # Try to find the outermost {...} block.
+                brace_start = cleaned.find("{")
+                brace_end = cleaned.rfind("}")
+                if brace_start >= 0 and brace_end > brace_start:
+                    parsed = json.loads(cleaned[brace_start:brace_end + 1])
+                else:
+                    raise
+            _LAST_LLM_SOURCE = {"source": "gemini", "error": None, "model": GEMINI_MODEL}
+            return parsed
         except Exception as e:
-            logger.warning("Gemini call failed, using mock: %s", e)
+            err_msg = f"{type(e).__name__}: {str(e)[:200]}"
+            logger.warning("Gemini call failed, using mock: %s", err_msg)
+            _LAST_LLM_SOURCE = {"source": "mock", "error": err_msg, "model": "mock"}
+            return _mock_llm(system, user)
 
+    _LAST_LLM_SOURCE = {"source": "mock", "error": None, "model": "mock (LLM_PROVIDER not set to gemini, or key missing)"}
     return _mock_llm(system, user)
 
 
@@ -1355,6 +1401,7 @@ Return a JSON object with EXACTLY these four keys:
             "source": "verbatim" if has_verbatim_source else "inferred",
             "source_section": source_section if has_verbatim_source else None,
             "source_artifact_title": matched_doc.get("title") if matched_doc else None,
+            "llm_source": dict(_LAST_LLM_SOURCE),  # which LLM actually responded
         }
     except Exception as e:
         logger.exception("Proposed-text generation failed: %s", e)
@@ -1367,6 +1414,7 @@ Return a JSON object with EXACTLY these four keys:
             "source": "inferred",
             "source_section": None,
             "source_artifact_title": matched_doc.get("title") if matched_doc else None,
+            "llm_source": {"source": "error", "error": f"{type(e).__name__}: {str(e)[:200]}", "model": "n/a"},
         }
 
 
@@ -2643,6 +2691,54 @@ def page_impact():
                         f"font-family:Consolas, monospace; font-size:13px; "
                         f"font-weight:600; margin-bottom:14px;'>"
                         f"{_esc(draft['section_reference'])}"
+                        f"</div>", unsafe_allow_html=True)
+
+                    # LLM source badge — tells the user WHICH model actually produced
+                    # this draft. Critical for trust: "Gemini Flash-Lite" vs "Mock fallback"
+                    # is a meaningful distinction the demo audience deserves to see.
+                    llm_info = draft.get("llm_source") or {}
+                    llm_src = llm_info.get("source", "unknown")
+                    llm_model = llm_info.get("model", "")
+                    llm_err = llm_info.get("error")
+                    if llm_src == "gemini":
+                        badge_bg = "#E1F1E3"
+                        badge_border = "#2F7A3E"
+                        badge_color = "#1a4a23"
+                        badge_text = f"✓ Generated by Gemini ({_esc(llm_model)})"
+                    elif llm_src == "mock" and llm_err:
+                        badge_bg = "#FBE7EC"
+                        badge_border = "#B8294A"
+                        badge_color = "#7A1A33"
+                        badge_text = (
+                            f"⚠ Gemini call failed — fell back to mock. "
+                            f"Error: {_esc(llm_err)}. "
+                            f"Check Streamlit Cloud secrets for GEMINI_API_KEY validity."
+                        )
+                    elif llm_src == "mock":
+                        badge_bg = "#FDF6E3"
+                        badge_border = "#B8860B"
+                        badge_color = "#5a4a1a"
+                        badge_text = (
+                            f"ℹ Generated by mock LLM (no Gemini configured). "
+                            f"To use Gemini, set LLM_PROVIDER=\"gemini\" and GEMINI_API_KEY in Streamlit Cloud secrets."
+                        )
+                    elif llm_src == "error":
+                        badge_bg = "#FBE7EC"
+                        badge_border = "#B8294A"
+                        badge_color = "#7A1A33"
+                        badge_text = f"⚠ Generation error: {_esc(llm_err or 'unknown')}"
+                    else:
+                        badge_bg = "#F6F8FB"
+                        badge_border = "#5A6783"
+                        badge_color = "#34425E"
+                        badge_text = f"LLM source: {_esc(llm_src)}"
+
+                    st.markdown(
+                        f"<div style='background:{badge_bg}; padding:8px 12px; "
+                        f"border-radius:4px; border-left:3px solid {badge_border}; "
+                        f"font-size:11px; color:{badge_color}; margin:14px 0 10px 0; "
+                        f"font-family:Consolas, monospace;'>"
+                        f"{badge_text}"
                         f"</div>", unsafe_allow_html=True)
 
                     if st.button("↻ Regenerate proposed text", key=f"regen_propose_{i}"):
