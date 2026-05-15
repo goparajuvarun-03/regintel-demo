@@ -693,8 +693,8 @@ def _mock_llm(system: str, user: str) -> dict:
             "mitigation_window_days": 90 if prio == "High" else (120 if prio == "Medium" else 180),
         }
 
-    # Impact analysis (default for regulation analysis prompts)
-    if ("impact" in u and "regulation" in u) or "analyze the impact" in u:
+    # Impact analysis (default for regulation analysis prompts) — match the EXACT first line of analyze_regulation()
+    if "analyze the impact of this regulation" in u or "analyze the impact" in u and "internal artifacts" in u:
         return {
             "regulation_summary": (
                 "Final Rule extends the continuity-of-care window for transitioning "
@@ -755,13 +755,15 @@ def _mock_llm(system: str, user: str) -> dict:
         }
 
     # Proposed-text change for an impacted artifact (mock for offline demo / no Gemini key)
-    if "policy-language change" in u or ("proposed_text" in u and "current_text_assumption" in u):
+    if ("policy-language change" in u or "current_text_verbatim" in u or
+        "actual current text from the internal artifact" in u or
+        ("proposed_text" in u and "current_text_assumption" in u)):
         # Extract the artifact name and gap description from the prompt so different cards
         # produce different proposed text (instead of all returning the same canned answer).
         import re as _re
         name_match = _re.search(r"Name:\s*(.+)", user)
         type_match = _re.search(r"Type:\s*(.+)", user)
-        gap_match  = _re.search(r"Gap identified:\s*(.+)", user)
+        gap_match  = _re.search(r"Gap identified.*?:\s*(.+)", user)
         rec_match  = _re.search(r"Recommended action \(high level\):\s*(.+)", user)
         reg_match  = _re.search(r"Identifier:\s*(.+)", user)
 
@@ -771,10 +773,97 @@ def _mock_llm(system: str, user: str) -> dict:
         rec_action    = (rec_match.group(1).strip() if rec_match else "")
         reg_id        = (reg_match.group(1).strip() if reg_match else "the regulation")
 
-        # Different proposed-text templates by artifact type
+        # NEW: detect if the prompt includes verbatim chunks from the actual artifact
+        # When the chunks block is present, extract a candidate verbatim sentence.
+        has_chunks = "ACTUAL CURRENT TEXT FROM THE INTERNAL ARTIFACT" in user
+        verbatim_quote = ""
+        source_section = ""
+        if has_chunks:
+            # Find the chunks block
+            chunks_start = user.find("ACTUAL CURRENT TEXT FROM THE INTERNAL ARTIFACT")
+            chunks_end = user.find("\nTASK\n", chunks_start) if chunks_start >= 0 else -1
+            if chunks_start >= 0 and chunks_end > chunks_start:
+                chunks_text = user[chunks_start:chunks_end]
+                # Pull out individual chunks: each starts with [CHUNK N] section: X
+                chunk_pat = _re.compile(
+                    r"\[CHUNK \d+\] section:\s*(.+?)\n(.+?)(?=\n\[CHUNK |\Z)",
+                    _re.DOTALL,
+                )
+                chunks_found = chunk_pat.findall(chunks_text)
+                # Score each sentence by gap-term overlap; pick best
+                gap_terms = set(_re.findall(r"\w+", gap_desc.lower()))
+                gap_terms |= set(_re.findall(r"\w+", rec_action.lower()))
+                # Strip noise terms
+                gap_terms -= {"the", "a", "an", "and", "or", "of", "to", "for",
+                              "in", "on", "is", "are", "be", "by", "as", "this",
+                              "that", "with", "from", "at"}
+
+                best_sentence = ""
+                best_section = ""
+                best_score = 0
+                for section_label, body in chunks_found:
+                    # Split body into sentences (simple split)
+                    body = body.strip()
+                    sentences = _re.split(r"(?<=[.!?])\s+(?=[A-Z])", body)
+                    for sent in sentences:
+                        sent_clean = sent.strip()
+                        if not sent_clean or len(sent_clean) < 25:
+                            continue
+                        sent_terms = set(_re.findall(r"\w+", sent_clean.lower()))
+                        overlap = len(gap_terms & sent_terms)
+                        # Bonus for sentences containing numeric/temporal cues (the most
+                        # likely to be the precise change target — e.g. "thirty (30) days")
+                        if _re.search(r"\d|thirty|sixty|ninety|annually|quarterly|monthly|days?\b", sent_clean.lower()):
+                            overlap += 2
+                        if overlap > best_score:
+                            best_score = overlap
+                            best_sentence = sent_clean
+                            best_section = section_label.strip()
+                # Fallback: use the first chunk's first sentence
+                if not best_sentence and chunks_found:
+                    first_section, first_body = chunks_found[0]
+                    first_sentences = _re.split(r"(?<=[.!?])\s+", first_body.strip())
+                    if first_sentences:
+                        best_sentence = first_sentences[0].strip()
+                        best_section = first_section.strip()
+                verbatim_quote = best_sentence
+
+                # Strip leading section-marker fragments like ".2 — Continuity Window"
+                # that the chunker can leave at the start of a sentence.
+                verbatim_quote = _re.sub(
+                    r"^[\.\s]*\d*\s*[—–-]\s*[A-Z][\w\s]+?\s+(?=[A-Z][a-z])",
+                    "",
+                    verbatim_quote,
+                ).strip()
+                # If trimming left it empty or too short, restore original
+                if len(verbatim_quote) < 25:
+                    verbatim_quote = best_sentence
+
+                # Clean up section label — chunker can leave awkward fragments like "§ 4" + ".2"
+                # split across boundary. Try to recover the real section marker from the
+                # start of the verbatim quote itself.
+                quote_section = ""
+                section_match = _re.match(
+                    r"^(§\s*\d+(?:\.\d+)?(?:\([a-zA-Z0-9]+\))?|STEP\s+\d+|"
+                    r"[A-Z][A-Z\s]{3,40}(?=\s+[A-Z][a-z]))",
+                    best_sentence,
+                )
+                if section_match:
+                    quote_section = section_match.group(1).strip()
+                # Prefer recovered section if it looks cleaner
+                if quote_section and len(quote_section) > len(best_section.replace("\n", " ")):
+                    source_section = quote_section
+                else:
+                    # Clean awkward newlines/fragments from the chunker's section
+                    source_section = _re.sub(r"\s+", " ", best_section).strip()
+                    # Cap length
+                    if len(source_section) > 30:
+                        source_section = source_section[:30] + "…"
+
+        # Build the proposed text — different templates per artifact type
         type_lower = artifact_type.lower()
         if "workflow" in type_lower or "sop" in type_lower or "procedure" in type_lower:
-            current_assumption = (
+            inferred_current = (
                 f"The current {artifact_name} workflow is expected to follow the prior procedure "
                 f"and does not incorporate the steps required by {reg_id}. "
                 f"Specifically: {gap_desc[:200]}"
@@ -787,7 +876,7 @@ def _mock_llm(system: str, user: str) -> dict:
                 f"the prescribed template."
             )
         elif "system" in type_lower:
-            current_assumption = (
+            inferred_current = (
                 f"The current {artifact_name} system specification reflects the prior requirement "
                 f"and does not enforce the validation needed for {reg_id}. "
                 f"Specifically: {gap_desc[:200]}"
@@ -799,8 +888,7 @@ def _mock_llm(system: str, user: str) -> dict:
                 f"accordingly, and a regression test plan shall be executed prior to release."
             )
         else:
-            # Policy / default
-            current_assumption = (
+            inferred_current = (
                 f"The current {artifact_name} is expected to reflect the prior {reg_id} requirement "
                 f"and is therefore out of compliance with the updated rule. "
                 f"Specifically: {gap_desc[:200]}"
@@ -818,12 +906,14 @@ def _mock_llm(system: str, user: str) -> dict:
             f"reduces audit and civil-monetary-penalty exposure."
         )
 
-        # Try to extract a section reference like "§ 422.138(b)" from the gap or rec_action text
         sect_match = _re.search(r"§\s*\d+\.\d+(?:\([a-zA-Z0-9]+\))*", user)
         section_ref = sect_match.group(0) if sect_match else reg_id
 
+        # Return verbatim quote if we had chunks, else inferred
         return {
-            "current_text_assumption": current_assumption,
+            "current_text_verbatim": verbatim_quote if has_chunks else inferred_current,
+            "source_section": source_section,
+            "current_text_assumption": verbatim_quote if has_chunks else inferred_current,  # backward-compat
             "proposed_text": proposed,
             "rationale": rationale,
             "section_reference": section_ref,
@@ -1084,14 +1174,90 @@ STRICT RULES FOR old_text AND new_text:
 #   1. LLM call to draft the language-change section (the part the AI is uniquely good at)
 #   2. python-docx assembly using analysis data + LLM output + sane defaults
 
+def _find_matching_internal_doc(impacted_area_name: str) -> dict | None:
+    """Find an uploaded internal artifact whose title best matches the given name.
+    Returns the document row (with doc_id, title, kind) or None if no match."""
+    if not impacted_area_name:
+        return None
+    target = impacted_area_name.strip().lower()
+    # Search across all non-regulation document kinds
+    candidates: list[dict] = []
+    for kind in ("policy", "sop", "system", "workflow"):
+        candidates.extend(db_list_documents(kind=kind))
+
+    if not candidates:
+        return None
+
+    # Exact title match (case-insensitive)
+    for d in candidates:
+        if d.get("title", "").strip().lower() == target:
+            return d
+
+    # Substring match in either direction
+    best = None
+    best_score = 0
+    target_words = set(re.findall(r"\w+", target))
+    for d in candidates:
+        title = d.get("title", "").strip().lower()
+        title_words = set(re.findall(r"\w+", title))
+        overlap = len(target_words & title_words)
+        # Require at least 2 word overlap to claim a match
+        if overlap >= 2 and overlap > best_score:
+            best = d
+            best_score = overlap
+    return best
+
+
+def _retrieve_artifact_text(doc_id: str, query: str, top_k: int = 3) -> list[dict]:
+    """Get the most relevant chunks from a specific internal document.
+    Returns list of {section, text, score} sorted by relevance."""
+    try:
+        chunks = retrieve_chunks(query=query, kind=None, top_k=20)
+    except Exception:
+        chunks = []
+    # Filter to just this document
+    matching = [c for c in chunks if c.doc_id == doc_id][:top_k]
+    return [
+        {
+            "section": c.section or "—",
+            "text": c.text,
+            "score": getattr(c, "score", 0.0),
+        }
+        for c in matching
+    ]
+
+
 def generate_proposed_text(regulation_doc: dict, analysis_result: dict,
                             impacted_area: dict) -> dict:
     """Call the LLM to draft the language change for an impacted artifact.
-    Returns a dict with four keys: current_text_assumption, proposed_text,
-    rationale, section_reference. Falls back to safe defaults on failure."""
+    Returns a dict with keys: current_text_assumption, proposed_text,
+    rationale, section_reference, source (one of "verbatim" or "inferred"),
+    and source_section (the artifact section the verbatim quote came from, or None).
+    Falls back to safe defaults on failure."""
 
-    user_prompt = f"""You are a senior healthcare compliance analyst at a Medicare Advantage payer.
-The internal artifact below must be updated to comply with the regulation. Draft the precise language change.
+    # Step 1: try to find the actual uploaded internal artifact
+    matched_doc = _find_matching_internal_doc(impacted_area.get("name", ""))
+
+    # Step 2: if found, retrieve the chunks most relevant to the gap description
+    artifact_chunks: list[dict] = []
+    if matched_doc:
+        gap_query = (
+            impacted_area.get("impact_reason", "") + " " +
+            impacted_area.get("recommended_action", "")
+        ).strip() or impacted_area.get("name", "")
+        artifact_chunks = _retrieve_artifact_text(matched_doc["doc_id"], gap_query, top_k=3)
+
+    has_verbatim_source = bool(artifact_chunks)
+
+    # Step 3: build a different prompt depending on whether we have source text
+    if has_verbatim_source:
+        chunks_block = "\n\n".join(
+            f"[CHUNK {i+1}] section: {c['section']}\n{c['text'][:800]}"
+            for i, c in enumerate(artifact_chunks)
+        )
+        user_prompt = f"""You are a senior healthcare compliance analyst at a Medicare Advantage payer.
+You have access to the ACTUAL CURRENT TEXT of the internal artifact below. Identify the specific
+sentence or short passage that conflicts with the regulation, and draft a precise replacement.
 
 REGULATION
 Title: {regulation_doc.get('title', 'Unknown')}
@@ -1099,40 +1265,85 @@ Identifier: {regulation_doc.get('regulation_id', 'N/A')}
 Effective date: {regulation_doc.get('effective_date', 'TBD')}
 Summary: {analysis_result.get('regulation_summary', '(no summary)')}
 
-INTERNAL ARTIFACT TO REMEDIATE
+INTERNAL ARTIFACT
+Name: {impacted_area.get('name', 'unknown')}
+Type: {impacted_area.get('type', 'unknown')}
+Gap identified by impact analysis: {impacted_area.get('impact_reason', '(no description)')}
+Recommended action (high level): {impacted_area.get('recommended_action', '(none)')}
+
+ACTUAL CURRENT TEXT FROM THE INTERNAL ARTIFACT (top retrieved sections):
+{chunks_block}
+
+TASK
+Return a JSON object with EXACTLY these four keys. Your response MUST be grounded in the
+actual current text above — do not invent or paraphrase.
+
+- current_text_verbatim: a VERBATIM quote (1-3 sentences) copied EXACTLY from the artifact text above. This is the specific sentence that must be replaced to comply with the regulation. Copy character-for-character including punctuation, capitalization, and section markers. If multiple passages must change, pick the single most central one.
+
+- source_section: the section identifier from the chunk you quoted (e.g. "§ 4.2" or "STEP 3" or "—" if no section was tagged).
+
+- proposed_text: 2-4 sentences of revised {impacted_area.get('type', 'policy')}-style language that will replace the verbatim text above. Write the prose AS IT WOULD APPEAR in the document itself — do not use framing like "We propose..." This MUST be specific to the artifact "{impacted_area.get('name', '')}" and the specific gap.
+
+- rationale: 1-2 sentences explaining why this exact wording is required, citing the regulation section explicitly (e.g. "Required per {regulation_doc.get('regulation_id', 'the regulation')} § XYZ").
+
+- section_reference: the specific regulation section that mandates this change (e.g. "§ 422.138(b)" or "42 CFR § 422.752"). Single string.
+
+IMPORTANT
+- current_text_verbatim MUST be copied character-for-character from the artifact text above. Do not summarize, paraphrase, or improve the wording. Do not add ellipsis. Pick a contiguous passage.
+- If none of the artifact text above conflicts with the regulation, return current_text_verbatim as "" and set source_section to "".
+- proposed_text must read as final policy/SOP/system prose, not as a memo about a policy.
+"""
+    else:
+        # No internal document uploaded → fall back to inferred-current-text mode, with honest label
+        user_prompt = f"""You are a senior healthcare compliance analyst at a Medicare Advantage payer.
+The user has not uploaded the actual internal artifact, so you must INFER what the current text likely says based on the gap description.
+
+REGULATION
+Title: {regulation_doc.get('title', 'Unknown')}
+Identifier: {regulation_doc.get('regulation_id', 'N/A')}
+Summary: {analysis_result.get('regulation_summary', '(no summary)')}
+
+INTERNAL ARTIFACT TO REMEDIATE (NOT uploaded — must infer)
 Name: {impacted_area.get('name', 'unknown')}
 Type: {impacted_area.get('type', 'unknown')}
 Gap identified: {impacted_area.get('impact_reason', '(no description)')}
 Recommended action (high level): {impacted_area.get('recommended_action', '(none)')}
 
 TASK
-Return a JSON object with EXACTLY these four keys. Your response MUST be specific to THIS artifact ({impacted_area.get('name', 'unknown')}) — not generic language that could apply to any artifact.
+Return a JSON object with EXACTLY these four keys:
 
-- current_text_assumption: 1-2 sentences describing what the analyst should expect the current text of the artifact named "{impacted_area.get('name', 'unknown')}" to say. Reference the specific gap: "{impacted_area.get('impact_reason', '')[:150]}". Frame as an assumption the analyst should verify, not as fact.
+- current_text_verbatim: 1-2 sentences describing what the analyst should expect the current text of "{impacted_area.get('name', '')}" to say. Frame as inferred, not as fact. The analyst will verify against their actual document.
 
-- proposed_text: 2-4 sentences of revised {impacted_area.get('type', 'policy')}-style language in formal regulatory prose. This is the EXACT wording the analyst will paste into the {impacted_area.get('name', 'artifact')} document, replacing the current text. The proposed_text MUST address the specific gap described above for THIS artifact. Do not include framing like "We propose..." — write the prose AS IT WOULD APPEAR in the document itself. The wording must differ meaningfully from any other artifact's proposed text.
+- source_section: an empty string "" (no source available — artifact not uploaded).
 
-- rationale: 1-2 sentences explaining why this exact wording is required, citing the regulation section explicitly (e.g. "Required per {regulation_doc.get('regulation_id', 'the regulation')} § XYZ"). Mention the artifact name "{impacted_area.get('name', '')}" by name.
+- proposed_text: 2-4 sentences of revised {impacted_area.get('type', 'policy')}-style language. Write AS IT WOULD APPEAR in the document — no framing like "We propose...". Specific to "{impacted_area.get('name', '')}" and the gap.
 
-- section_reference: the specific regulation section that mandates this change, formatted as in the source (e.g. "§ 422.138(b)" or "42 CFR § 422.752"). Single string, not an array.
+- rationale: 1-2 sentences citing the regulation section explicitly.
 
-IMPORTANT
-- Use formal compliance-officer prose for proposed_text. The artifact is a real {impacted_area.get('type', 'policy')} document; the language must sound like one, not a memo or summary.
-- The proposed_text must reference or address the specific artifact "{impacted_area.get('name', '')}" — generic answers that could apply to any artifact are wrong.
-- Cite the regulation section explicitly in rationale.
-- Never fabricate verbatim policy text in current_text_assumption — describe what it likely says, frame as analyst-to-verify.
+- section_reference: the regulation section (e.g. "§ 422.138(b)"). Single string.
 """
 
     try:
         result = call_llm(
-            system="You are a senior healthcare compliance analyst. You draft precise "
-                   "policy-language changes for compliance remediation. Return ONLY valid JSON.",
+            system=(
+                "You are a senior healthcare compliance analyst. You produce precise, "
+                "artifact-grounded language changes. When verbatim source text is provided, "
+                "you copy it character-for-character; you never paraphrase. "
+                "Return ONLY valid JSON."
+            ),
             user=user_prompt,
-            max_tokens=900,
+            max_tokens=1100,
         )
+        current_verbatim = str(result.get("current_text_verbatim") or "").strip()
+        source_section = str(result.get("source_section") or "").strip()
+
+        # If we promised verbatim but got nothing, fall back to inferred mode in the response
+        if has_verbatim_source and not current_verbatim:
+            has_verbatim_source = False  # downgrade the label
+
         return {
-            "current_text_assumption": str(result.get("current_text_assumption") or
-                "[Verify current text in the affected artifact before applying changes.]"),
+            "current_text_assumption": current_verbatim or
+                "[Verify current text in the affected artifact before applying changes.]",
             "proposed_text": str(result.get("proposed_text") or
                 impacted_area.get("recommended_action") or
                 "[AI-drafted language unavailable. Analyst to draft compliant replacement text.]"),
@@ -1141,16 +1352,21 @@ IMPORTANT
             "section_reference": str(result.get("section_reference") or
                 regulation_doc.get('regulation_id') or
                 regulation_doc.get('title', 'See regulation')),
+            "source": "verbatim" if has_verbatim_source else "inferred",
+            "source_section": source_section if has_verbatim_source else None,
+            "source_artifact_title": matched_doc.get("title") if matched_doc else None,
         }
     except Exception as e:
         logger.exception("Proposed-text generation failed: %s", e)
-        # Hard fallback
         return {
             "current_text_assumption": "[Verify current text in the affected artifact before applying changes.]",
             "proposed_text": impacted_area.get("recommended_action") or
                 "[Analyst to draft compliant replacement language.]",
             "rationale": f"Required to comply with {regulation_doc.get('regulation_id') or regulation_doc.get('title')}.",
             "section_reference": regulation_doc.get('regulation_id') or "See regulation",
+            "source": "inferred",
+            "source_section": None,
+            "source_artifact_title": matched_doc.get("title") if matched_doc else None,
         }
 
 
@@ -2324,28 +2540,75 @@ def page_impact():
 
                 draft = st.session_state.get(prop_key)
                 if draft:
+                    source_mode = draft.get("source", "inferred")
+                    source_section = draft.get("source_section")
+                    matched_title = draft.get("source_artifact_title")
+
+                    # Top banner: different message for verbatim vs inferred
+                    if source_mode == "verbatim":
+                        banner_text = (
+                            f"<b>Verbatim quote from your uploaded artifact:</b> The text below "
+                            f"in section 1 is copied directly from <b>{_esc(matched_title or ia.get('name', ''))}</b>"
+                            + (f", section <b>{_esc(source_section)}</b>" if source_section and source_section != "—" else "") + ". "
+                            f"Replace that text in the document with the proposed text in section 2."
+                        )
+                        banner_bg = "#E1F1E3"
+                        banner_border = "#2F7A3E"
+                        banner_color = "#1a4a23"
+                    else:
+                        banner_text = (
+                            f"<b>Inferred (no uploaded artifact found):</b> Section 1 below is the AI's "
+                            f"description of what <b>{_esc(ia.get('name', 'this artifact'))}</b> probably says — "
+                            f"not a verbatim quote. To get verbatim quoting, upload your actual "
+                            f"{ia.get('type', 'policy').lower()} document on the Upload page and try again."
+                        )
+                        banner_bg = "#FDF6E3"
+                        banner_border = "#B8860B"
+                        banner_color = "#5a4a1a"
+
                     st.markdown(
-                        "<div style='background:#FDF6E3; padding:10px 14px; "
-                        "border-radius:6px; border-left:3px solid #B8860B; "
-                        "font-size:12.5px; color:#5a4a1a; margin-bottom:14px;'>"
-                        "<b>How to use this:</b> Locate the current text in your "
-                        f"<b>{ia.get('name', 'artifact')}</b> document, then replace it "
-                        "with the proposed text below. Always validate the current-text "
-                        "assumption against the actual document before applying."
-                        "</div>",
+                        f"<div style='background:{banner_bg}; padding:10px 14px; "
+                        f"border-radius:6px; border-left:3px solid {banner_border}; "
+                        f"font-size:12.5px; color:{banner_color}; margin-bottom:14px;'>"
+                        f"{banner_text}"
+                        f"</div>",
                         unsafe_allow_html=True)
 
-                    # Section 1: FIND THIS (current text assumption, crimson)
+                    # Section 1 — different label and style depending on source mode
+                    if source_mode == "verbatim":
+                        section1_label = "1 · VERBATIM TEXT FROM YOUR ARTIFACT"
+                        section1_label_color = "#2F7A3E"
+                        section1_bg = "#F0F8F2"
+                        section1_text_color = "#1a4a23"
+                        section1_font_style = "normal"   # verbatim — not italic, because it IS the document text
+                        # Add source attribution line
+                        attribution = (
+                            f"<div style='font-size:10px; color:#5a6783; margin-top:8px; font-style:italic;'>"
+                            f"Source: {_esc(matched_title or '')}"
+                            + (f", {_esc(source_section)}" if source_section and source_section != "—" else "") +
+                            f"</div>"
+                        )
+                    else:
+                        section1_label = "1 · LIKELY CURRENT TEXT (analyst to verify)"
+                        section1_label_color = "#B8860B"
+                        section1_bg = "#FDF6E3"
+                        section1_text_color = "#5a4a1a"
+                        section1_font_style = "italic"   # inferred — italic to signal "not literal"
+                        attribution = ""
+
                     st.markdown(
-                        "<div style='font-size:10.5px; letter-spacing:1.5px; "
-                        "color:#B8294A; font-weight:700; margin-top:4px; margin-bottom:4px;'>"
-                        "1 · FIND THIS TEXT IN THE ARTIFACT"
-                        "</div>", unsafe_allow_html=True)
+                        f"<div style='font-size:10.5px; letter-spacing:1.5px; "
+                        f"color:{section1_label_color}; font-weight:700; margin-top:4px; margin-bottom:4px;'>"
+                        f"{section1_label}"
+                        f"</div>", unsafe_allow_html=True)
                     st.markdown(
-                        f"<div style='background:#FBE7EC; padding:12px 14px; "
-                        f"border-radius:6px; font-style:italic; color:#7A1A33; "
-                        f"font-size:13.5px; line-height:1.5; margin-bottom:14px;'>"
+                        f"<div style='background:{section1_bg}; padding:12px 14px; "
+                        f"border-radius:6px; font-style:{section1_font_style}; "
+                        f"color:{section1_text_color}; "
+                        f"font-size:13.5px; line-height:1.5; margin-bottom:14px; "
+                        f"white-space:pre-wrap;'>"
                         f"{_esc(draft['current_text_assumption'])}"
+                        f"{attribution}"
                         f"</div>", unsafe_allow_html=True)
 
                     # Section 2: REPLACE WITH (proposed text, green) — IN A COPYABLE CODE BLOCK
@@ -2354,8 +2617,6 @@ def page_impact():
                         "color:#2F7A3E; font-weight:700; margin-bottom:4px;'>"
                         "2 · REPLACE WITH THIS TEXT (click the copy icon to copy)"
                         "</div>", unsafe_allow_html=True)
-                    # st.code provides a built-in copy button in Streamlit
-                    # st.code handles text safely — no escape needed here
                     st.code(draft['proposed_text'], language=None)
 
                     # Section 3: RATIONALE
