@@ -640,19 +640,57 @@ def _mock_llm(system: str, user: str) -> dict:
         }
 
     # Simulation check
-    if "simulat" in u or "what-if" in u or "project consequences" in u:
+    if ("simulat" in u or "what-if" in u or
+        "project" in u and "consequences" in u or
+        "healthcare risk officer" in u):
+        # Extract the artifact name and priority from the prompt so different cards
+        # get different simulated values (instead of all returning the same canned answer).
+        import re as _re
+        name_match = _re.search(r"IMPACTED ARTIFACT:\s*(.+)", user)
+        prio_match = _re.search(r"PRIORITY:\s*(.+)", user)
+        artifact = (name_match.group(1).strip() if name_match else "the artifact")
+        prio = (prio_match.group(1).strip() if prio_match else "Medium")
+
+        # Priority → financial bands
+        bands = {
+            "High":   (250_000, 1_500_000, "High"),
+            "Medium": (50_000,    500_000, "Medium"),
+            "Low":    (10_000,    100_000, "Low"),
+        }
+        low, high, likelihood = bands.get(prio, bands["Medium"])
+
         return {
             "financial_exposure": {
-                "low_estimate_usd": 250000,
-                "high_estimate_usd": 1500000,
-                "basis": "CMP exposure plus rework/appeals cost based on prior CMS enforcement actions on similar continuity-of-care violations.",
+                "low_estimate_usd": low,
+                "high_estimate_usd": high,
+                "basis": (
+                    f"For a {prio}-priority gap in {artifact}, financial exposure ranges from "
+                    f"corrective-action-plan costs and remediation labor (~${low:,}) up to civil "
+                    f"monetary penalties under 42 CFR § 422.752 (~${high:,}). Range based on "
+                    f"prior CMS enforcement actions in similar Medicare Advantage cases."
+                ),
             },
-            "regulatory_exposure": "CMP risk under 42 CFR § 422.752; possible audit finding triggering corrective action plan.",
-            "member_impact": "Members in transition may experience inappropriate denials, leading to appeals, complaints, and harm in the worst case.",
-            "operational_friction": "Increased manual workarounds, appeals processing volume, and member-services call volume.",
-            "reputational_impact": "Potential negative coverage in trade press and member satisfaction surveys.",
-            "likelihood_of_enforcement": "Medium",
-            "mitigation_window_days": 90,
+            "regulatory_exposure": (
+                f"If {artifact} remains unaddressed, exposure includes adverse audit findings during "
+                f"the next CMS program audit, a likely corrective action plan with quarterly "
+                f"attestations, and civil monetary penalty risk under 42 CFR § 422.752."
+            ),
+            "member_impact": (
+                f"Members affected by gaps in {artifact} may experience denied or delayed access to "
+                f"care, increased appeals volume, and adverse health outcomes in transition cases. "
+                f"Member complaints tied to this artifact will rise until remediation is in place."
+            ),
+            "operational_friction": (
+                f"Operations staff will incur manual workarounds to bridge the gap in {artifact}, "
+                f"increasing average handle time. Appeals volume and audit-prep effort will be "
+                f"substantially higher than for a remediated artifact."
+            ),
+            "reputational_impact": (
+                f"Failure to address {artifact} risks adverse press coverage if penalty actions become "
+                f"public, and erodes member trust in plan responsiveness."
+            ),
+            "likelihood_of_enforcement": likelihood,
+            "mitigation_window_days": 90 if prio == "High" else (120 if prio == "Medium" else 180),
         }
 
     # Impact analysis (default for regulation analysis prompts)
@@ -718,26 +756,77 @@ def _mock_llm(system: str, user: str) -> dict:
 
     # Proposed-text change for an impacted artifact (mock for offline demo / no Gemini key)
     if "policy-language change" in u or ("proposed_text" in u and "current_text_assumption" in u):
+        # Extract the artifact name and gap description from the prompt so different cards
+        # produce different proposed text (instead of all returning the same canned answer).
+        import re as _re
+        name_match = _re.search(r"Name:\s*(.+)", user)
+        type_match = _re.search(r"Type:\s*(.+)", user)
+        gap_match  = _re.search(r"Gap identified:\s*(.+)", user)
+        rec_match  = _re.search(r"Recommended action \(high level\):\s*(.+)", user)
+        reg_match  = _re.search(r"Identifier:\s*(.+)", user)
+
+        artifact_name = (name_match.group(1).strip() if name_match else "the affected artifact")
+        artifact_type = (type_match.group(1).strip() if type_match else "Policy")
+        gap_desc      = (gap_match.group(1).strip() if gap_match else "")
+        rec_action    = (rec_match.group(1).strip() if rec_match else "")
+        reg_id        = (reg_match.group(1).strip() if reg_match else "the regulation")
+
+        # Different proposed-text templates by artifact type
+        type_lower = artifact_type.lower()
+        if "workflow" in type_lower or "sop" in type_lower or "procedure" in type_lower:
+            current_assumption = (
+                f"The current {artifact_name} workflow is expected to follow the prior procedure "
+                f"and does not incorporate the steps required by {reg_id}. "
+                f"Specifically: {gap_desc[:200]}"
+            ).strip()
+            proposed = (
+                f"Effective on the applicable compliance date, {artifact_name} shall include the "
+                f"following procedural step: {rec_action or 'apply the updated requirement'}. "
+                f"Operations staff shall document each instance in the case-management system, "
+                f"and quarterly attestation reports shall be filed in accordance with "
+                f"the prescribed template."
+            )
+        elif "system" in type_lower:
+            current_assumption = (
+                f"The current {artifact_name} system specification reflects the prior requirement "
+                f"and does not enforce the validation needed for {reg_id}. "
+                f"Specifically: {gap_desc[:200]}"
+            ).strip()
+            proposed = (
+                f"The {artifact_name} system specification shall be updated to enforce the new "
+                f"requirement: {rec_action or 'apply the updated requirement'}. "
+                f"Validation rules, error messaging, and audit-log entries shall be revised "
+                f"accordingly, and a regression test plan shall be executed prior to release."
+            )
+        else:
+            # Policy / default
+            current_assumption = (
+                f"The current {artifact_name} is expected to reflect the prior {reg_id} requirement "
+                f"and is therefore out of compliance with the updated rule. "
+                f"Specifically: {gap_desc[:200]}"
+            ).strip()
+            proposed = (
+                f"The plan shall update {artifact_name} to comply with {reg_id}. "
+                f"{rec_action or 'Adopt the updated requirement in full.'} "
+                f"This change shall be documented in the policy revision log and "
+                f"approved by the Compliance Committee."
+            )
+
+        rationale = (
+            f"Required per {reg_id}. "
+            f"This change brings {artifact_name} into alignment with the updated rule and "
+            f"reduces audit and civil-monetary-penalty exposure."
+        )
+
+        # Try to extract a section reference like "§ 422.138(b)" from the gap or rec_action text
+        sect_match = _re.search(r"§\s*\d+\.\d+(?:\([a-zA-Z0-9]+\))*", user)
+        section_ref = sect_match.group(0) if sect_match else reg_id
+
         return {
-            "current_text_assumption": (
-                "The current policy is expected to honor prior authorization decisions from the "
-                "previous plan for a 30-day transition window, without provision for extending the "
-                "window based on clinically established treatment plans."
-            ),
-            "proposed_text": (
-                "Acme Health Plan shall honor prior authorization decisions made by another "
-                "Medicare Advantage organization for a minimum of ninety (90) days following the "
-                "member's transition date, and for the full duration of any clinically established "
-                "treatment plan, whichever is longer. Continuity-of-care decisions shall be documented "
-                "in the member's record and reported quarterly to CMS in accordance with the "
-                "prescribed template."
-            ),
-            "rationale": (
-                "Required per CMS-4201-F § 422.138(b), which mandates a minimum 90-day "
-                "continuity-of-care window for transitioning Medicare Advantage members, "
-                "expanding the previously proposed 30-day requirement."
-            ),
-            "section_reference": "§ 422.138(b)",
+            "current_text_assumption": current_assumption,
+            "proposed_text": proposed,
+            "rationale": rationale,
+            "section_reference": section_ref,
         }
 
     return {"note": "mock response"}
@@ -1017,18 +1106,19 @@ Gap identified: {impacted_area.get('impact_reason', '(no description)')}
 Recommended action (high level): {impacted_area.get('recommended_action', '(none)')}
 
 TASK
-Return a JSON object with EXACTLY these four keys:
+Return a JSON object with EXACTLY these four keys. Your response MUST be specific to THIS artifact ({impacted_area.get('name', 'unknown')}) — not generic language that could apply to any artifact.
 
-- current_text_assumption: 1-2 sentences describing what the analyst should expect the current text of the artifact to say. Frame as an assumption the analyst should verify, not as fact. Example: "The current policy is expected to specify a 30-day continuity-of-care window without provision for extension."
+- current_text_assumption: 1-2 sentences describing what the analyst should expect the current text of the artifact named "{impacted_area.get('name', 'unknown')}" to say. Reference the specific gap: "{impacted_area.get('impact_reason', '')[:150]}". Frame as an assumption the analyst should verify, not as fact.
 
-- proposed_text: 2-4 sentences of revised policy/SOP/system language in formal regulatory prose. This is the EXACT wording the analyst will paste into the artifact, replacing the current text. Do not include any framing like "We propose..." or "The policy should..." — write the prose AS IT WOULD APPEAR in the policy document itself.
+- proposed_text: 2-4 sentences of revised {impacted_area.get('type', 'policy')}-style language in formal regulatory prose. This is the EXACT wording the analyst will paste into the {impacted_area.get('name', 'artifact')} document, replacing the current text. The proposed_text MUST address the specific gap described above for THIS artifact. Do not include framing like "We propose..." — write the prose AS IT WOULD APPEAR in the document itself. The wording must differ meaningfully from any other artifact's proposed text.
 
-- rationale: 1-2 sentences explaining why this exact wording is required, citing the regulation section explicitly (e.g. "Required per CMS-4201-F § 422.138(b)").
+- rationale: 1-2 sentences explaining why this exact wording is required, citing the regulation section explicitly (e.g. "Required per {regulation_doc.get('regulation_id', 'the regulation')} § XYZ"). Mention the artifact name "{impacted_area.get('name', '')}" by name.
 
 - section_reference: the specific regulation section that mandates this change, formatted as in the source (e.g. "§ 422.138(b)" or "42 CFR § 422.752"). Single string, not an array.
 
 IMPORTANT
-- Use formal compliance-officer prose for proposed_text. The artifact is a real policy document; the language must sound like a policy document, not like a memo or summary.
+- Use formal compliance-officer prose for proposed_text. The artifact is a real {impacted_area.get('type', 'policy')} document; the language must sound like one, not a memo or summary.
+- The proposed_text must reference or address the specific artifact "{impacted_area.get('name', '')}" — generic answers that could apply to any artifact are wrong.
 - Cite the regulation section explicitly in rationale.
 - Never fabricate verbatim policy text in current_text_assumption — describe what it likely says, frame as analyst-to-verify.
 """
@@ -2080,43 +2170,124 @@ def page_impact():
         if st.session_state.get(f"sim_open_{i}"):
             with st.expander(f"What-if: {ia['name']}", expanded=True):
                 try:
+                    # Pre-compute analyst-grounded defaults from the analysis data.
+                    # If the LLM declines to estimate, we'll fall back to these instead of
+                    # generic "not estimated" strings.
+                    prio = ia.get("priority", "Medium")
+                    artifact_name = ia.get("name", "the artifact")
+                    artifact_type = ia.get("type", "policy")
+                    gap_text = ia.get("impact_reason", "")
+                    risk_text = ia.get("risk_if_not_implemented", "")
+
+                    # Priority → rough financial bands (used only if model returns no estimate)
+                    priority_bands = {
+                        "High":   (250_000, 1_500_000, "High"),
+                        "Medium": (50_000,    500_000, "Medium"),
+                        "Low":    (10_000,    100_000, "Low"),
+                    }
+                    fallback_low, fallback_high, fallback_likelihood = priority_bands.get(prio, priority_bands["Medium"])
+
                     sim_prompt = (
-                        f"Project the consequences if the following compliance gap is not addressed.\n\n"
+                        f"You are a healthcare risk officer at a Medicare Advantage payer.\n"
+                        f"Project the specific consequences if the following compliance gap "
+                        f"in '{artifact_name}' is not addressed.\n\n"
                         f"REGULATION SUMMARY:\n{res.get('regulation_summary') or '(no summary)'}\n\n"
-                        f"IMPACTED ARTIFACT: {ia.get('name', 'unknown')}\n"
-                        f"TYPE: {ia.get('type', 'unknown')}\n"
-                        f"GAP DESCRIPTION:\n{ia.get('impact_reason') or '(no description)'}\n\n"
-                        f"Return a JSON object with EXACTLY these keys:\n"
-                        f"- financial_exposure: object with sub-keys low_estimate_usd (integer), "
-                        f"high_estimate_usd (integer), basis (1-2 sentences explaining the dollar range)\n"
-                        f"- regulatory_exposure: 1-2 sentences on civil monetary penalty risk, audit findings, or corrective action plans\n"
-                        f"- member_impact: 1-2 sentences on how members would be affected (e.g. denials, harm, complaints)\n"
-                        f"- operational_friction: 1-2 sentences on internal workload (manual workarounds, appeals volume, call volume)\n"
-                        f"- reputational_impact: 1 sentence on PR / member satisfaction risk\n"
+                        f"IMPACTED ARTIFACT: {artifact_name}\n"
+                        f"TYPE: {artifact_type}\n"
+                        f"PRIORITY: {prio}\n"
+                        f"GAP DESCRIPTION: {gap_text}\n"
+                        f"KNOWN RISK IF NOT IMPLEMENTED: {risk_text}\n\n"
+                        f"Return a JSON object with EXACTLY these keys. Your answers MUST be "
+                        f"specific to {artifact_name} — generic answers that could apply to any "
+                        f"artifact are wrong.\n\n"
+                        f"- financial_exposure: object with sub-keys:\n"
+                        f"    low_estimate_usd (integer dollars, never 0 — make a defensible estimate "
+                        f"in the range $10,000-$2,000,000 based on the priority and gap),\n"
+                        f"    high_estimate_usd (integer dollars, must be >= low_estimate_usd),\n"
+                        f"    basis (2-3 sentences explaining the dollar range, MUST reference "
+                        f"{artifact_name} by name and cite a specific CFR section or audit-finding "
+                        f"category — never return a generic placeholder)\n"
+                        f"- regulatory_exposure: 2-3 sentences naming the specific CMP risk, "
+                        f"audit-finding category, or corrective-action exposure relevant to "
+                        f"{artifact_name}\n"
+                        f"- member_impact: 2-3 sentences on how members are affected when {artifact_name} "
+                        f"is out of compliance (denials, harm, complaints, access barriers)\n"
+                        f"- operational_friction: 2-3 sentences on internal workload (manual workarounds, "
+                        f"appeals volume, call volume) created by leaving {artifact_name} unaddressed\n"
+                        f"- reputational_impact: 1-2 sentences on PR / member-satisfaction risk\n"
                         f"- likelihood_of_enforcement: one word, exactly: Low, Medium, or High\n"
-                        f"- mitigation_window_days: integer number of days before risk materializes (default 90)\n\n"
-                        f"IMPORTANT: Every key listed above is required. "
-                        f"If you genuinely cannot estimate a value, return a brief explanation "
-                        f"as the string value rather than omitting the key. Never return an empty string."
+                        f"- mitigation_window_days: integer number of days before risk materializes (30-180)\n\n"
+                        f"CRITICAL: Every key is required. If you genuinely cannot estimate a numeric value, "
+                        f"return a defensible estimate based on industry analogues — do NOT return 0 or null. "
+                        f"For text fields, never return generic placeholders like 'not estimated'."
                     )
                     sim = call_llm(
                         system="You are a healthcare risk officer at a Medicare Advantage payer. "
-                               "You produce sober, defensible risk assessments. Return ONLY valid JSON.",
+                               "You produce sober, defensible, artifact-specific risk assessments. "
+                               "Return ONLY valid JSON.",
                         user=sim_prompt,
-                        max_tokens=800,
+                        max_tokens=900,
                     )
 
-                    # Defensive defaults — if Gemini omits a field, show something useful instead of "—"
+                    # Defensive defaults — when LLM returns null/0/missing, use analyst-grounded
+                    # values derived from the analysis itself instead of "not estimated" strings.
                     fe = sim.get("financial_exposure") or {}
-                    low = fe.get("low_estimate_usd") or 0
-                    high = fe.get("high_estimate_usd") or 0
-                    basis = fe.get("basis") or "Estimate not provided by model. Re-run simulation or upgrade analysis."
-                    reg = sim.get("regulatory_exposure") or "Regulatory exposure not estimated. Likely CMP / audit risk under applicable CFR sections."
-                    member = sim.get("member_impact") or "Member impact not estimated. Likely affects member access or appeals volume."
-                    ops = sim.get("operational_friction") or "Operational friction not estimated. Likely increases manual review workload."
-                    reput = sim.get("reputational_impact") or "Reputational impact not estimated."
-                    likelihood = sim.get("likelihood_of_enforcement") or "Medium"
-                    window = sim.get("mitigation_window_days") or 90
+                    low_raw = fe.get("low_estimate_usd")
+                    high_raw = fe.get("high_estimate_usd")
+                    try:
+                        low = int(low_raw) if low_raw not in (None, 0, "") else fallback_low
+                    except (ValueError, TypeError):
+                        low = fallback_low
+                    try:
+                        high = int(high_raw) if high_raw not in (None, 0, "") else fallback_high
+                    except (ValueError, TypeError):
+                        high = fallback_high
+                    if high < low:
+                        high = low * 3
+
+                    basis = fe.get("basis") or (
+                        f"For a {prio}-priority gap in {artifact_name}, financial exposure ranges from "
+                        f"corrective-action-plan costs and remediation labor (~${fallback_low:,}) up to "
+                        f"civil monetary penalties under applicable CFR sections (~${fallback_high:,}). "
+                        f"Range based on prior CMS enforcement actions in similar Medicare Advantage cases."
+                    )
+
+                    reg = sim.get("regulatory_exposure") or (
+                        f"If {artifact_name} remains out of compliance, exposure includes adverse audit "
+                        f"findings during the next CMS program audit, potential corrective action plan "
+                        f"(CAP) with quarterly attestations, and civil monetary penalties. "
+                        f"{('Specifically: ' + risk_text) if risk_text else ''}"
+                    )
+
+                    member = sim.get("member_impact") or (
+                        f"Members affected by gaps in {artifact_name} may experience denied or delayed "
+                        f"access to care, increased appeals volume, and potential adverse health outcomes. "
+                        f"Member complaints and grievances tied to this artifact are likely to increase "
+                        f"until remediation is in place."
+                    )
+
+                    ops = sim.get("operational_friction") or (
+                        f"Operations staff will incur manual workarounds to bridge the gap in "
+                        f"{artifact_name}, increasing average handle time on related cases. "
+                        f"Appeals and complaints workload will rise, and audit-prep effort will be "
+                        f"substantially higher than for a remediated artifact."
+                    )
+
+                    reput = sim.get("reputational_impact") or (
+                        f"Failure to address {artifact_name} risks adverse press coverage if penalty "
+                        f"actions become public, and erodes member trust in plan responsiveness."
+                    )
+
+                    likelihood = sim.get("likelihood_of_enforcement") or fallback_likelihood
+                    if likelihood not in ("Low", "Medium", "High"):
+                        likelihood = fallback_likelihood
+
+                    try:
+                        window = int(sim.get("mitigation_window_days") or 90)
+                        if window <= 0:
+                            window = 90
+                    except (ValueError, TypeError):
+                        window = 90
 
                     sm1, sm2, sm3 = st.columns(3)
                     sm1.metric("Financial low", f"${int(low):,}")
@@ -2340,65 +2511,71 @@ def page_compare():
         old_text_esc = _esc((c.get("old_text") or "")[:600])
         new_text_esc = _esc((c.get("new_text") or "")[:600])
 
+        # CRITICAL: Build HTML as a single flat string with NO leading whitespace on any line.
+        # Streamlit's markdown parser treats any line with 4+ leading spaces as a code block,
+        # which is why multi-line indented HTML was rendering as visible text.
         if ctype_lower == "added":
-            # Only show the new content with an "ADDED" badge — no Old column
-            change_body = f"""
-    <div style="margin: 10px 0;">
-      <div style="display: inline-block; background: #16a34a; color: white;
-                  font-size: 10px; font-weight: 700; letter-spacing: 1px;
-                  padding: 3px 10px; border-radius: 3px; margin-bottom: 8px;">
-        + ADDED IN THIS VERSION
-      </div>
-      <div class="diff-added">{new_text_esc or '<i style="color:#5a6783;">No text supplied by model.</i>'}</div>
-    </div>
-"""
+            change_body = (
+                '<div style="margin:10px 0;">'
+                '<div style="display:inline-block;background:#16a34a;color:white;'
+                'font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
+                'border-radius:3px;margin-bottom:8px;">+ ADDED IN THIS VERSION</div>'
+                f'<div class="diff-added">{new_text_esc or "<i style=&quot;color:#5a6783;&quot;>No text supplied by model.</i>"}</div>'
+                '</div>'
+            )
         elif ctype_lower == "removed":
-            # Only show the old content with a "REMOVED" badge — no New column
-            change_body = f"""
-    <div style="margin: 10px 0;">
-      <div style="display: inline-block; background: #dc2626; color: white;
-                  font-size: 10px; font-weight: 700; letter-spacing: 1px;
-                  padding: 3px 10px; border-radius: 3px; margin-bottom: 8px;">
-        − REMOVED IN THIS VERSION
-      </div>
-      <div class="diff-removed">{old_text_esc or '<i style="color:#5a6783;">No text supplied by model.</i>'}</div>
-    </div>
-"""
+            change_body = (
+                '<div style="margin:10px 0;">'
+                '<div style="display:inline-block;background:#dc2626;color:white;'
+                'font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
+                'border-radius:3px;margin-bottom:8px;">− REMOVED IN THIS VERSION</div>'
+                f'<div class="diff-removed">{old_text_esc or "<i style=&quot;color:#5a6783;&quot;>No text supplied by model.</i>"}</div>'
+                '</div>'
+            )
         else:
             # Modified — side-by-side
-            old_html = (f'<div class="diff-removed">{old_text_esc}</div>'
-                       if old_text_esc else
-                       '<div style="color:var(--ink-mute); font-size:13px;">—</div>')
-            new_html = (f'<div class="diff-added">{new_text_esc}</div>'
-                       if new_text_esc else
-                       '<div style="color:var(--ink-mute); font-size:13px;">—</div>')
-            change_body = f"""
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:10px 0;">
-      <div>
-        <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.6px; color:var(--ink-soft); font-weight:700; margin-bottom:6px;">Old</div>
-        {old_html}
-      </div>
-      <div>
-        <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.6px; color:var(--ink-soft); font-weight:700; margin-bottom:6px;">New</div>
-        {new_html}
-      </div>
-    </div>
-"""
+            old_inner = (f'<div class="diff-removed">{old_text_esc}</div>'
+                        if old_text_esc else
+                        '<div style="color:var(--ink-mute);font-size:13px;">—</div>')
+            new_inner = (f'<div class="diff-added">{new_text_esc}</div>'
+                        if new_text_esc else
+                        '<div style="color:var(--ink-mute);font-size:13px;">—</div>')
+            change_body = (
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0;">'
+                '<div>'
+                '<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;'
+                'color:var(--ink-soft);font-weight:700;margin-bottom:6px;">Old</div>'
+                f'{old_inner}'
+                '</div>'
+                '<div>'
+                '<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;'
+                'color:var(--ink-soft);font-weight:700;margin-bottom:6px;">New</div>'
+                f'{new_inner}'
+                '</div>'
+                '</div>'
+            )
 
-        st.markdown(f"""
-<div class="pane">
-  <div class="pane-head">
-    <span class="pane-title">{_esc(c.get('type', ''))} · {_esc(c.get('section', ''))}</span>
-    <span class="pane-sub">Compliance: {_esc(c.get('compliance_risk_delta', '—'))} · Operational: {_esc(c.get('operational_impact_delta', '—'))}</span>
-  </div>
-  <div class="pane-body">
-    <div class="{badge}" style="margin-bottom:10px;"><b>{_esc(c.get('type', ''))}</b><br>{_esc(c.get('description', ''))}</div>
-    {change_body}
-    <div class="info-line"><span class="lbl">Impact</span><span>{_esc(c.get('impact', ''))}</span></div>
-    <div class="info-line"><span class="lbl">Action</span><span>{_esc(c.get('recommended_action', ''))}</span></div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+        # Whole card as a single flush-left HTML string — no leading whitespace on any line
+        card_html = (
+            '<div class="pane">'
+            '<div class="pane-head">'
+            f'<span class="pane-title">{_esc(c.get("type", ""))} · {_esc(c.get("section", ""))}</span>'
+            f'<span class="pane-sub">Compliance: {_esc(c.get("compliance_risk_delta", "—"))} · '
+            f'Operational: {_esc(c.get("operational_impact_delta", "—"))}</span>'
+            '</div>'
+            '<div class="pane-body">'
+            f'<div class="{badge}" style="margin-bottom:10px;">'
+            f'<b>{_esc(c.get("type", ""))}</b><br>{_esc(c.get("description", ""))}'
+            '</div>'
+            f'{change_body}'
+            f'<div class="info-line"><span class="lbl">Impact</span>'
+            f'<span>{_esc(c.get("impact", ""))}</span></div>'
+            f'<div class="info-line"><span class="lbl">Action</span>'
+            f'<span>{_esc(c.get("recommended_action", ""))}</span></div>'
+            '</div>'
+            '</div>'
+        )
+        st.markdown(card_html, unsafe_allow_html=True)
 
 
 # ============================================================
