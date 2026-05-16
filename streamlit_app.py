@@ -1298,17 +1298,18 @@ STRICT RULES FOR old_text AND new_text:
 def _find_matching_internal_doc(impacted_area_name: str,
                                   impacted_area_type: str | None = None) -> dict | None:
     """Find an uploaded internal artifact whose title best matches the given name.
-    When impacted_area_type is provided, ONLY consider documents whose kind matches the type
-    (Policy → policy, Workflow → sop, System → system). This prevents the matcher from
-    cross-mapping a "Prior Authorization System" impact to a "Prior Authorization Continuity
-    Policy" document just because they share the words "Prior Authorization".
-
-    Returns the document row (with doc_id, title, kind) or None if no good match."""
+    Strategy (in order):
+      1. Filter candidates by kind (Policy → policy, Workflow → sop/workflow, System → system).
+      2. Exact title match (case-insensitive).
+      3. Word-overlap match — 33% mean coverage minimum, using minimal stopword stripping.
+      4. Substring fallback — if one title is contained in the other (after normalization).
+      5. Single-document fallback — if EXACTLY ONE document of the matching kind exists,
+         use it. This is the pragmatic right answer when each artifact type has one doc.
+    Returns the document row, or None if no candidate at all."""
     if not impacted_area_name:
         return None
     target = impacted_area_name.strip().lower()
 
-    # Map impacted-area type → uploaded-document kind(s)
     type_to_kinds = {
         "policy":   ("policy",),
         "workflow": ("sop", "workflow"),
@@ -1318,7 +1319,6 @@ def _find_matching_internal_doc(impacted_area_name: str,
     if impacted_area_type:
         kinds = type_to_kinds.get(impacted_area_type.strip().lower(), ())
     else:
-        # If type is unknown, allow all kinds (legacy behaviour)
         kinds = ("policy", "sop", "system", "workflow")
 
     candidates: list[dict] = []
@@ -1328,40 +1328,56 @@ def _find_matching_internal_doc(impacted_area_name: str,
     if not candidates:
         return None
 
-    # Exact title match (case-insensitive) within the kind-filtered set
+    # 2. Exact title match
     for d in candidates:
         if d.get("title", "").strip().lower() == target:
             return d
 
-    # Word-overlap match with HIGHER threshold and proportional requirement.
-    # The match must cover ≥50% of the target's significant words to count.
-    # Drop common filler words from the comparison.
-    STOP = {"the", "a", "an", "of", "for", "to", "and", "or",
-            "prior", "current", "internal", "core"}
+    # Minimal stopword set — DO NOT strip healthcare-relevant terms like
+    # "prior", "authorization", "claims", "system" because those are what
+    # the matcher actually needs to compare on.
+    STOP = {"the", "a", "an", "of", "for", "to", "and", "or", "in", "on", "by"}
     def sig(words: set[str]) -> set[str]:
-        return {w for w in words if w not in STOP and len(w) > 2}
+        return {w for w in words if w not in STOP and len(w) > 1}
 
     target_sig = sig(set(re.findall(r"\w+", target)))
-    if not target_sig:
-        return None  # nothing to match against
 
+    # 3. Word-overlap match — threshold lowered to 33% mean coverage
     best = None
     best_score = 0.0
     for d in candidates:
         title = d.get("title", "").strip().lower()
         title_sig = sig(set(re.findall(r"\w+", title)))
-        if not title_sig:
+        if not title_sig or not target_sig:
             continue
         overlap = len(target_sig & title_sig)
-        # Score = harmonic-mean-like ratio so both sides must overlap proportionally
-        coverage_target = overlap / len(target_sig)
-        coverage_title  = overlap / len(title_sig)
-        score = (coverage_target + coverage_title) / 2
-        # Require at least 50% mean coverage to claim a match
-        if score >= 0.5 and score > best_score:
+        if overlap == 0:
+            continue
+        cov_target = overlap / len(target_sig)
+        cov_title  = overlap / len(title_sig)
+        score = (cov_target + cov_title) / 2
+        if score >= 0.33 and score > best_score:
             best = d
             best_score = score
-    return best
+    if best:
+        return best
+
+    # 4. Substring fallback — one normalized title contained in the other
+    target_norm = re.sub(r"\W+", " ", target).strip()
+    for d in candidates:
+        title = d.get("title", "").strip().lower()
+        title_norm = re.sub(r"\W+", " ", title).strip()
+        if len(target_norm) > 5 and len(title_norm) > 5:
+            if target_norm in title_norm or title_norm in target_norm:
+                return d
+
+    # 5. Single-document fallback — if exactly one doc of the matching kind exists,
+    # that's almost certainly the right one. Demo deployments typically have one doc
+    # per type, so this is the pragmatic last-resort that gets the demo working.
+    if len(candidates) == 1:
+        return candidates[0]
+
+    return None
 
 
 def _retrieve_artifact_text(doc_id: str, query: str, top_k: int = 3) -> list[dict]:
