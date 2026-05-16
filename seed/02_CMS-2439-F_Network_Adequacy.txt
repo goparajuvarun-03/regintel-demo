@@ -1,0 +1,141 @@
+CMS-2439-F · MEDICARE ADVANTAGE NETWORK ADEQUACY AND PROVIDER DIRECTORY ACCURACY FINAL RULE
+Issuing body: Centers for Medicare & Medicaid Services (CMS)
+Regulation ID: CMS-2439-F
+Effective date: 2026-04-01
+Status: Final Rule
+Publication: Federal Register, Vol. 90, No. 248
+
+
+§ 1.0 — Purpose
+
+This Final Rule establishes minimum requirements for provider network
+adequacy and the maintenance, accuracy, and public availability of
+provider directories for Medicare Advantage organizations. The Rule
+responds to documented patterns of "ghost networks" in which listed
+providers are unavailable, no longer practicing at the listed
+location, or no longer accepting new patients.
+
+
+§ 2.0 — Scope
+
+This Rule applies to all Medicare Advantage organizations, Special
+Needs Plans, and Cost Plans operating under 42 CFR Part 422. It is
+binding on contract year 2026 and forward.
+
+
+§ 3.0 — Definitions
+
+(a) "Provider directory" means any printed, electronic, or telephonic
+list of network providers published by or on behalf of a Medicare
+Advantage organization, intended for use by enrollees and prospective
+enrollees in selecting providers.
+
+(b) "Verified entry" means a directory entry for which the provider
+has affirmatively confirmed, within the verification window defined
+in § 5.2, that the entry's information remains accurate.
+
+(c) "Time and distance standard" means the maximum travel time or
+travel distance from an enrollee's residence to the nearest network
+provider of a given specialty, as defined in Appendix A of this Rule.
+
+
+§ 4.0 — Network Adequacy Requirements
+
+§ 4.1 — Time-and-Distance Standards
+
+Each Medicare Advantage organization shall maintain a provider
+network meeting the time-and-distance standards in Appendix A for
+each county in the service area, for the following specialty
+categories: primary care, cardiology, oncology, behavioral health,
+endocrinology, nephrology, and ophthalmology.
+
+§ 4.2 — Behavioral Health Adequacy
+
+For behavioral health specifically, the network shall include not
+fewer than one (1) in-network psychiatrist per five thousand (5,000)
+enrollees and not fewer than one (1) in-network licensed therapist
+or psychologist per two thousand (2,000) enrollees.
+
+§ 4.3 — Annual Network Adequacy Attestation
+
+Each Medicare Advantage organization shall attest to network adequacy
+annually no later than January 31, using the prescribed CMS form.
+
+
+§ 5.0 — Directory Accuracy
+
+§ 5.1 — Verification Window
+
+Each directory entry shall be verified by the listed provider at
+least every NINETY (90) days. An entry not verified within the
+ninety-day window shall be marked as "unverified" in all
+member-facing displays and shall be removed from the directory if
+not verified within an additional thirty (30) days.
+
+§ 5.2 — Required Verification Data Elements
+
+Verification shall confirm at minimum:
+  (i) provider's current practice location(s);
+  (ii) current acceptance of new patients of the relevant LOB;
+  (iii) current telephone number for appointment scheduling;
+  (iv) current panel size or appointment-availability indicator;
+  (v) any languages spoken other than English;
+  (vi) wheelchair accessibility and ADA compliance flags.
+
+§ 5.3 — Directory Refresh Cadence
+
+Public-facing provider directories shall be refreshed not less than
+once every five (5) business days. The refresh process shall apply
+all verification updates received since the prior refresh.
+
+
+§ 6.0 — Member Notification
+
+§ 6.1 — Material Change Notification
+
+If a network provider is removed from the directory or otherwise
+becomes unavailable, members assigned to that provider as primary
+care provider, or with an active prior authorization referencing
+that provider, shall be notified within ten (10) business days of
+the removal.
+
+§ 6.2 — Substitution Right
+
+A member whose primary care provider is removed shall be permitted
+to select a replacement provider from the current network at no
+out-of-pocket cost, regardless of network-tier differentials.
+
+
+§ 7.0 — Reporting
+
+§ 7.1 — Quarterly Directory Accuracy Report
+
+Each Medicare Advantage organization shall submit to CMS, within
+thirty (30) calendar days of the close of each calendar quarter,
+a directory accuracy report containing:
+  (i) total directory entries by specialty;
+  (ii) verification rate by specialty;
+  (iii) member complaints related to directory inaccuracy;
+  (iv) corrective actions taken;
+  (v) network-adequacy compliance status by county.
+
+§ 7.2 — Member Complaint Tracking
+
+Each Medicare Advantage organization shall maintain a member
+complaint log specific to directory inaccuracy, retained for not
+less than six (6) years, and shall make it available to CMS on
+request.
+
+
+§ 8.0 — Enforcement
+
+Failure to comply with this Rule may result in:
+  (a) civil monetary penalty under 42 CFR § 422.752 up to fifty
+      thousand dollars ($50,000) per occurrence for material
+      directory inaccuracy resulting in member harm;
+  (b) intermediate sanctions including suspension of marketing
+      activities and new enrollment;
+  (c) corrective action plan with monthly attestations until
+      directory verification rate exceeds ninety-five percent (95%);
+  (d) referral to the HHS Office of Inspector General for pattern
+      violations.

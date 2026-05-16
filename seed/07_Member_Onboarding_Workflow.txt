@@ -1,0 +1,149 @@
+MEMBER ONBOARDING WORKFLOW
+Document type: SOP / Workflow
+Owner: Member Services · Care Management
+Workflow ID: ACME-MS-WF-021
+Version: v4.1 (current)
+Last reviewed: 2025-10-15
+Next scheduled review: 2026-10-15
+
+
+§ 1.0 — Purpose
+
+This workflow defines the end-to-end steps for onboarding a newly
+enrolled Acme Health Plan Medicare Advantage member, from receipt
+of the enrollment file to the member's first claim being processed.
+It coordinates the Member Services, Care Management, Pharmacy
+Benefits, and Provider Network teams.
+
+
+§ 2.0 — Scope
+
+This workflow applies to all new Medicare Advantage enrollees in
+Acme Health Plan, including AEP, OEP, IEP, ICEP, and SEP enrollment
+periods. It governs the first thirty (30) days following the
+effective enrollment date.
+
+
+§ 3.0 — Workflow Steps
+
+STEP 1 — Enrollment File Receipt (Day 0)
+Member Services receives the daily enrollment file from CMS. The
+file is loaded into MEMBER-DB and triggers downstream onboarding
+events. Identification of transitioning members (those previously
+enrolled with another insurer) is based on the Prior Insurer Code
+field in the CMS file.
+
+STEP 2 — Welcome Packet Generation (Day 1-3)
+The system generates a welcome packet containing the member ID
+card, summary of benefits, and printed provider directory. The
+packet is mailed by Member Communications within five (5) business
+days of enrollment file receipt.
+
+STEP 3 — Primary Care Provider (PCP) Selection (Day 1-30)
+The member is prompted to select a PCP via the member portal,
+member app, or Member Services line. If no selection is made by
+day thirty (30), the system auto-assigns a PCP based on member
+address and current network availability.
+
+STEP 4 — Prior Authorization Continuity Check (Day 1-7)
+For transitioning members, Member Services attempts to obtain the
+prior insurer's PA records via the Member Services line. Members
+are advised to provide their prior insurer's PA approval letters
+within fifteen (15) days of enrollment. Records received are
+forwarded to Utilization Management for review under the Prior
+Authorization Continuity Policy (ACME-UM-POL-014).
+
+STEP 5 — Care Management Outreach (Day 7-21)
+Care Management performs a risk stratification on the new member
+using claims history (when available) and self-reported health
+data. High-risk members (HCC score above 1.5) receive a Care
+Manager assignment within fourteen (14) days. Medium-risk members
+receive a Health Risk Assessment outreach call within twenty-one
+(21) days.
+
+STEP 6 — Pharmacy Benefits Verification (Day 1-14)
+Pharmacy Benefits checks for active prescription drug PAs from the
+prior insurer. Where active PAs exist for non-formulary drugs,
+Pharmacy Benefits processes a transition fill of up to thirty (30)
+days while the member's clinician submits a formulary exception.
+
+STEP 7 — First Claim Processing (Variable, typically Day 14-30)
+The first claim submitted on behalf of the member triggers a soft
+flag in ACME-CLAIMS-CORE. The flag prompts a manual review for
+appropriate application of continuity-of-care benefits.
+
+
+§ 4.0 — Documentation Requirements
+
+§ 4.1 — Member Files
+
+For each new member, Member Services creates a member file
+containing:
+  (i) the original CMS enrollment record;
+  (ii) any prior insurer PA records provided;
+  (iii) welcome packet acknowledgement (if returned);
+  (iv) PCP selection record.
+
+§ 4.2 — Cross-System Audit Trail
+
+Each step in the workflow creates an audit-log entry in the
+member's master record, capturing system, user, timestamp, and
+action.
+
+
+§ 5.0 — Service Levels
+
+  - Welcome packet mailing: within ten (10) business days of
+    enrollment.
+  - PA continuity review: within fifteen (15) days of receipt
+    of prior insurer records.
+  - High-risk Care Manager assignment: within fourteen (14) days
+    of enrollment.
+  - Transition fill processing: within forty-eight (48) hours of
+    prescription submission.
+
+
+§ 6.0 — Reporting
+
+§ 6.1 — Monthly Onboarding Metrics
+
+Member Services publishes a monthly onboarding metrics dashboard
+covering:
+  - total new enrollments;
+  - PCP selection rate by Day 30;
+  - PA continuity reviews completed;
+  - HRA completion rate;
+  - transition fills processed.
+
+§ 6.2 — Exception Tracking
+
+Onboarding exceptions (delays, missing data, member complaints)
+are tracked in the Exception Log and reviewed weekly by the Member
+Services Operations Lead.
+
+
+§ 7.0 — Roles and Responsibilities
+
+  - Member Services: enrollment file processing, welcome packet,
+    PCP selection support.
+  - Care Management: risk stratification, Care Manager assignment.
+  - Pharmacy Benefits: PA continuity, transition fills.
+  - Utilization Management: clinical review of prior insurer PAs.
+  - Provider Network Operations: directory inclusion, network
+    adequacy verification for member service area.
+
+
+KNOWN GAPS (internal note, not part of workflow)
+
+  - STEP 1: workflow lacks a transition-flag decision step at file
+    intake. Currently all transitioning members receive the same
+    handling regardless of clinical complexity or prior PA volume.
+  - STEP 2: printed directory may not reflect verified provider
+    data; pending alignment with the Provider Network Management
+    SOP refresh-cadence update.
+  - STEP 4: fifteen-day window for prior PA documentation is tight
+    given CMS-4201 continuity-window requirements; under review.
+  - STEP 7: claims continuity flag is a soft flag only; system does
+    not automatically apply continuity rules under CMS-4201.
+  - § 5.0: ten-business-day directory mailing exceeds the CMS-2439
+    directory-currency expectations for new enrollees.

@@ -1,0 +1,162 @@
+CLAIMS ADJUDICATION SYSTEM SPECIFICATION
+Document type: System Specification
+Owner: Claims Engineering · IT Architecture
+System name: ACME-CLAIMS-CORE
+System ID: ACME-SYS-SPEC-003
+Version: v1.7 (current production)
+Last architecture review: 2025-08-12
+Next scheduled review: 2026-02-12
+
+
+§ 1.0 — Purpose
+
+This specification documents the design, business rules, and
+operational behavior of the ACME-CLAIMS-CORE claims adjudication
+system, which processes all Medicare Advantage Part C claims
+submitted to Acme Health Plan.
+
+
+§ 2.0 — Scope
+
+This specification applies to:
+  - ACME-CLAIMS-CORE production system, version 1.7;
+  - integration points with eligibility, network, and PA systems;
+  - downstream interfaces to payment processing and provider
+    explanation-of-benefits generation.
+
+
+§ 3.0 — System Architecture Overview
+
+§ 3.1 — Components
+
+The system consists of:
+  - Ingest service (EDI 837 inbound, NPI-validated);
+  - Eligibility validator (real-time call to MEMBER-DB);
+  - Coverage rules engine (RULE-PACK v4.12);
+  - Medical-necessity review queue (manual + ML-assisted);
+  - Adjudication decision engine;
+  - Payment file generator (835 outbound).
+
+§ 3.2 — Throughput
+
+The system processes approximately one million two hundred thousand
+(1,200,000) claims per month. Peak hourly volume is approximately
+six thousand (6,000) claims.
+
+
+§ 4.0 — Business Rules
+
+§ 4.1 — Timely Filing Window
+
+The system rejects in-network provider claims received more than
+one hundred eighty (180) calendar days after the date of service,
+with rejection reason code "TFL01" (Timely Filing Limit Exceeded).
+Out-of-network claims have a one-year (365 day) window.
+
+§ 4.2 — Clean Claim Adjudication SLA
+
+The system targets adjudication of clean claims within forty-five
+(45) calendar days of receipt. This SLA is enforced by the
+adjudication queue prioritizer.
+
+§ 4.3 — Non-Clean-Claim Handling
+
+When a claim is identified as non-clean (missing required field,
+failed validation, missing attachment), the system generates a
+request for additional information letter. The letter is mailed
+within thirty (30) calendar days of identification, and the
+adjudication clock is paused until the additional information is
+received.
+
+§ 4.4 — Coordination of Benefits
+
+For claims requiring coordination of benefits with another primary
+payer, the system holds the claim in a "COB-PENDING" queue until
+the primary payer's EOB is received. The system does not impose a
+timely-filing rejection on COB-PENDING claims within the COB
+holding period.
+
+
+§ 5.0 — Interest and Penalty Calculation
+
+§ 5.1 — Late Payment Interest
+
+The system does not currently calculate or post interest on late
+clean-claim payments. Provider Relations manually reviews any
+provider complaint regarding late payment and issues interest
+adjustments on a case-by-case basis.
+
+§ 5.2 — Interest Rate Source
+
+There is no system-level field for the Treasury interest rate.
+Manual interest adjustments use the Treasury rate published on the
+date of adjustment.
+
+
+§ 6.0 — Reporting Interfaces
+
+§ 6.1 — Daily Claims Aging Extract
+
+The system generates a daily claims-aging extract for the Finance
+team. The extract reports total claims by aging bucket
+(0-30, 31-60, 61-90, >90 days).
+
+§ 6.2 — Monthly Compliance Extract
+
+The system generates a monthly compliance extract for the
+Compliance team. The extract reports total denials, denial reasons,
+appeals filed, and appeal outcomes.
+
+§ 6.3 — Star Ratings Data Push
+
+The system does not currently publish claims-adjudication
+performance data to the Star Ratings data feed. Performance data
+is reported manually by the Compliance team on an annual basis.
+
+
+§ 7.0 — Integration Points
+
+§ 7.1 — MEMBER-DB Eligibility
+
+The system calls MEMBER-DB in real time for eligibility
+verification on every inbound claim. Call timeout is set at three
+(3) seconds. Timeout claims are routed to the manual review queue.
+
+§ 7.2 — Network Verification
+
+The system calls PROVIDER-DB to verify provider network status at
+the date of service. The verification result is logged with the
+claim for audit purposes.
+
+§ 7.3 — Prior Authorization Lookup
+
+The system calls PA-DB to confirm that any required prior
+authorization is on file. Claims with missing required PA are
+denied with reason code "PA01" (Required PA Not Found).
+
+
+§ 8.0 — Audit and Compliance
+
+§ 8.1 — Audit Log Retention
+
+Adjudication decisions are retained in the audit log for ten (10)
+years from date of service.
+
+§ 8.2 — User Activity Logging
+
+User activity in the adjudication system is logged with userID,
+timestamp, claim ID, and action taken. Logs are retained for seven
+(7) years.
+
+
+KNOWN LIMITATIONS (internal note, not part of spec)
+
+  - § 4.2 clean-claim SLA is 45 days, currently exceeding CMS
+    standard of 30 days for clean-claim adjudication.
+  - § 5.1 no automated interest calculation on late payments;
+    manual process not scalable to expected volume.
+  - § 6.3 no automated Star Ratings data feed; CMS-MLN-7521
+    references claims-adjudication performance as Star Rating
+    measure C36 input.
+  - § 4.1 timely filing reject is hard-coded; no exception path
+    for member-good-cause requests.

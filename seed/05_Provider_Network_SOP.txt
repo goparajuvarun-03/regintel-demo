@@ -1,0 +1,148 @@
+PROVIDER NETWORK MANAGEMENT STANDARD OPERATING PROCEDURE
+Document type: SOP
+Owner: Provider Network Operations
+SOP number: ACME-NET-SOP-007
+Version: v2.4 (current)
+Last reviewed: 2025-09-22
+Next scheduled review: 2026-09-22
+
+
+§ 1.0 — Purpose
+
+This Standard Operating Procedure defines the day-to-day operational
+steps for maintaining the Acme Health Plan provider network,
+including provider data verification, directory publication, and
+member-facing accuracy controls.
+
+
+§ 2.0 — Scope
+
+This SOP applies to all Provider Network Operations staff,
+contracted credentialing vendors, and Provider Data Services.
+It governs the provider directory published at
+providers.acmehealthplan.com and the printed directory mailed to
+new enrollees within ten (10) business days of enrollment.
+
+
+§ 3.0 — Definitions
+
+(a) "Directory entry" means a single record in the provider master
+file representing one provider at one practice location.
+
+(b) "Verification" means the process of confirming with the
+provider that the directory entry's data is current and correct.
+
+(c) "Refresh" means publication of the verified provider master file
+to the public-facing directory.
+
+
+§ 4.0 — Provider Verification Workflow
+
+§ 4.1 — Verification Cadence
+
+Each directory entry is verified at least once every one hundred
+eighty (180) days. Verification is initiated by the Provider Data
+Services team using automated outreach (email + portal) and follows
+up with phone outreach if no response within fourteen (14) days.
+
+§ 4.2 — Verification Data Elements
+
+The verification request asks the provider to confirm:
+  (i) practice location address;
+  (ii) telephone number;
+  (iii) accepting-new-patients status;
+  (iv) languages spoken;
+  (v) hospital affiliations.
+
+§ 4.3 — Wheelchair and ADA Accessibility
+
+Wheelchair accessibility and ADA compliance flags are captured at
+provider credentialing but are not part of the routine verification
+cycle. Updates are accepted via the provider portal at any time.
+
+§ 4.4 — Unresponsive Providers
+
+A provider who fails to respond to two (2) consecutive verification
+cycles is flagged as "stale" in the master file. Stale entries are
+escalated to the Provider Relations team for direct outreach.
+
+
+§ 5.0 — Directory Publication
+
+§ 5.1 — Refresh Frequency
+
+The public-facing directory is refreshed monthly, on the first
+business day of each month, with all verified updates received
+since the prior refresh.
+
+§ 5.2 — Print Directory
+
+The print directory mailed to new enrollees is generated on the
+first business day of each month from the same master file. It is
+distributed by the Member Communications team within ten (10)
+business days of new enrollee identification.
+
+§ 5.3 — Online Directory Display
+
+Each entry displays a "last verified" date. Entries verified more
+than one hundred eighty (180) days ago display a yellow caution
+banner advising members to call the provider's office to confirm
+availability.
+
+
+§ 6.0 — Member Complaint Handling
+
+§ 6.1 — Inaccuracy Reports
+
+Members may report directory inaccuracies via the Member Services
+line or the online complaint form. Inaccuracy reports are routed to
+Provider Data Services for investigation within five (5) business
+days.
+
+§ 6.2 — Resolution Timeline
+
+Resolution of an inaccuracy report is targeted at fifteen (15)
+business days from receipt. Resolution may include directory entry
+update, removal of the entry, or escalation to Provider Relations.
+
+§ 6.3 — Complaint Log
+
+A complaint log is maintained by Provider Data Services and is
+reviewed monthly by the Provider Network Operations Director.
+Complaints are retained for three (3) years from date of receipt.
+
+
+§ 7.0 — Network Adequacy Monitoring
+
+§ 7.1 — Time-and-Distance Analysis
+
+Network Operations runs a time-and-distance analysis annually,
+no later than December 31 of each year, using GeoNetworks software.
+Results are compared to current CMS standards and any gaps are
+reported to the Network Strategy team.
+
+§ 7.2 — Behavioral Health Specialty Tracking
+
+Behavioral health provider density is tracked separately on a
+quarterly basis. The tracking dashboard is reviewed by the
+Behavioral Health Operations Lead.
+
+
+§ 8.0 — Roles and Responsibilities
+
+  - Provider Data Services: executes verification workflow.
+  - Provider Relations: outreach to unresponsive providers.
+  - Member Communications: publishes the directory.
+  - Network Operations: monitors adequacy and complaints.
+  - Provider Network Operations Director: monthly complaint review.
+
+
+KNOWN GAPS (internal note, not part of SOP)
+
+  - § 4.1 verification cadence may need to move from 180 days to
+    90 days based on CMS-2439 Final Rule.
+  - § 5.1 monthly refresh may need to move to a 5-business-day
+    cadence to meet directory accuracy standards.
+  - § 6.3 complaint retention currently three (3) years; CMS-2439
+    requires not less than six (6) years.
+  - § 7.1 annual adequacy attestation cadence under review.

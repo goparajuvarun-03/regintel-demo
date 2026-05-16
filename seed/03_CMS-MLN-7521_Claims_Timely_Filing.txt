@@ -1,0 +1,145 @@
+CMS-MLN-7521 · MEDICARE CLAIMS TIMELY FILING AND ADJUDICATION STANDARDS
+Issuing body: Centers for Medicare & Medicaid Services (CMS), Medicare Learning Network
+Regulation ID: CMS-MLN-7521
+Effective date: 2026-03-01
+Status: Final guidance (binding)
+Publication: MLN Matters Number MM-7521, 42 CFR § 422.520 update
+
+
+§ 1.0 — Purpose
+
+This guidance establishes minimum standards for claims timely filing
+deadlines and adjudication turnaround times for Medicare Advantage
+organizations. The guidance updates the previously issued MLN-6113
+timing schedule and supersedes any conflicting plan-level standards
+that result in shorter turnaround times for enrollees or providers.
+
+
+§ 2.0 — Scope
+
+This guidance applies to all Medicare Advantage organizations
+processing Part C claims, including in-network and out-of-network
+provider submissions, member-submitted reimbursement claims, and
+coordination-of-benefits claims with other primary payers.
+
+
+§ 3.0 — Definitions
+
+(a) "Clean claim" means a claim that has no defect, impropriety,
+incomplete documentation, or particular circumstance requiring
+special treatment that prevents timely payment from being made on
+the claim.
+
+(b) "Adjudication" means the process by which a Medicare Advantage
+organization determines whether to pay or deny a submitted claim,
+including all medical-necessity review, eligibility verification,
+and coverage determination steps.
+
+(c) "Notice of Adverse Benefit Determination" means a written notice
+issued to a member when a claim is denied in whole or in part, in a
+form meeting the requirements of 42 CFR § 422.568.
+
+
+§ 4.0 — Timely Filing Deadlines
+
+§ 4.1 — Provider-Submitted Claims
+
+In-network providers shall submit claims for services rendered no
+later than ONE HUNDRED EIGHTY (180) calendar days from the date of
+service. Out-of-network providers shall submit claims no later than
+THREE HUNDRED SIXTY-FIVE (365) calendar days from the date of
+service.
+
+§ 4.2 — Member-Submitted Reimbursement Claims
+
+A member submitting a claim for reimbursement for out-of-pocket
+expenses shall do so no later than THREE HUNDRED SIXTY-FIVE (365)
+calendar days from the date of service. The Medicare Advantage
+organization shall not deny a member-submitted claim on timeliness
+grounds where the member can demonstrate good cause for late
+submission, including but not limited to medical incapacity, postal
+delivery failure, or natural disaster.
+
+§ 4.3 — Coordination-of-Benefits Claims
+
+Claims requiring coordination of benefits with another primary payer
+shall not be denied on timely-filing grounds before the primary
+payer has issued an explanation of benefits, plus ninety (90)
+additional days.
+
+
+§ 5.0 — Adjudication Timeliness
+
+§ 5.1 — Standard Clean-Claim Adjudication
+
+A Medicare Advantage organization shall adjudicate a clean claim
+within THIRTY (30) calendar days of receipt. Adjudication includes
+issuance of payment for approved claims and issuance of a Notice of
+Adverse Benefit Determination for denied claims.
+
+§ 5.2 — Non-Clean-Claim Adjudication
+
+Where a submitted claim is not a clean claim, the organization shall
+issue a written request for additional information within fifteen
+(15) calendar days of receipt. Once the requested information is
+received, the thirty (30) day adjudication clock resumes.
+
+§ 5.3 — Expedited Adjudication
+
+For claims involving emergency services or post-stabilization care,
+the organization shall adjudicate the claim within FIFTEEN (15)
+calendar days of receipt. Members and providers shall have access
+to an expedited appeals process under 42 CFR § 422.584.
+
+
+§ 6.0 — Interest Accrual
+
+§ 6.1 — Mandatory Interest on Late Payments
+
+Where a Medicare Advantage organization fails to adjudicate a clean
+claim within the thirty (30) day window, the organization shall pay
+the provider or member interest on the unpaid amount, calculated at
+the rate published by the U.S. Department of the Treasury, accruing
+daily from day thirty-one (31) forward.
+
+§ 6.2 — Posting Requirement
+
+The interest calculation methodology and the current rate shall be
+posted on the Medicare Advantage organization's public website and
+shall be communicated to providers upon enrollment in the network.
+
+
+§ 7.0 — Reporting
+
+§ 7.1 — Monthly Claims-Aging Report
+
+Each Medicare Advantage organization shall submit a claims-aging
+report to CMS no later than the tenth (10th) calendar day of each
+month, reflecting the prior month's claims processing. The report
+shall contain:
+  (i) total claims received;
+  (ii) total claims adjudicated within thirty (30) days;
+  (iii) total claims pending over thirty (30) days, broken down
+       by aging bucket (31-60, 61-90, 91-120, >120 days);
+  (iv) total interest paid for late adjudications;
+  (v) total appeals filed and dispositions.
+
+§ 7.2 — Public Performance Disclosure
+
+The percentage of clean claims adjudicated within thirty (30) days
+shall be published on the Medicare Advantage organization's public
+website, updated quarterly, and shall be considered Medicare Star
+Rating input data per Star Rating measure C36 (effective rating
+year 2027).
+
+
+§ 8.0 — Enforcement
+
+Failure to comply with this guidance may result in:
+  (a) civil monetary penalty under 42 CFR § 422.752 up to ten
+      thousand dollars ($10,000) per occurrence;
+  (b) downward adjustment of Star Ratings under Star Rating
+      measure C36;
+  (c) network-provider grievance escalation to CMS Region office;
+  (d) corrective action plan with weekly aging reports for not
+      less than six (6) months.

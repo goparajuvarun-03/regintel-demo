@@ -1,0 +1,124 @@
+PRIOR AUTHORIZATION CONTINUITY POLICY
+Document type: Policy
+Owner: Compliance · Utilization Management
+Policy number: ACME-UM-POL-014
+Version: v3.2 (current)
+Last reviewed: 2025-11-04
+Next scheduled review: 2026-11-04
+
+
+§ 1.0 — Purpose
+
+This policy governs how Acme Health Plan handles prior authorization
+(PA) decisions when new members transition into the plan from another
+Medicare Advantage organization, from Original Medicare, or from
+Medicaid managed care. Its objective is to prevent disruption of
+ongoing medically necessary treatments during the transition period.
+
+
+§ 2.0 — Scope
+
+This policy applies to Acme Health Plan Medicare Advantage products,
+including HMO, PPO, D-SNP, and C-SNP lines of business, in all
+contracted service areas. It is binding on Acme staff, delegated
+utilization management vendors, and contracted providers.
+
+
+§ 3.0 — Definitions
+
+(a) "Transitioning member" means a member whose effective enrollment
+date with Acme Health Plan is within the prior thirty (30) days, and
+who was previously enrolled with another insurer or with Original
+Medicare.
+
+(b) "Prior plan PA decision" means a documented prior authorization
+decision issued by the member's previous insurer for a service or
+medication that remains medically necessary at the time of transition.
+
+(c) "Treatment plan" means a documented course of clinical care
+defined by an attending or specialty provider.
+
+
+§ 4.0 — Continuity Requirements
+
+§ 4.1 — General Continuity Standard
+
+When a new member enrolls in Acme Health Plan, the plan will accept
+existing prior authorization decisions made by the prior plan for
+ongoing treatments, subject to the limits below.
+
+§ 4.2 — Continuity Window
+
+Acme Health Plan honors prior plan PA decisions for thirty (30) days
+following the member's effective enrollment date. After day thirty
+(30), the member's care must be re-authorized under Acme's standard
+PA process.
+
+§ 4.3 — Exception for Active Cancer Treatment
+
+For active oncology treatment in progress at the time of transition,
+the plan extends the continuity window to ninety (90) days. The
+member's oncologist must submit treatment plan documentation to
+Acme's clinical review team within fifteen (15) days of the
+member's enrollment.
+
+§ 4.4 — Documentation Requirements
+
+Acme's clinical team requires the following to honor a prior plan
+PA decision:
+  (i) the prior plan's PA approval letter or claim history;
+  (ii) the member's relevant clinical notes;
+  (iii) the prescribing provider's NPI;
+  (iv) the treatment's CPT or HCPCS code.
+
+§ 4.5 — Reporting
+
+The Utilization Management department submits an annual report to
+the Compliance Committee documenting:
+  - total transitioning members;
+  - total prior plan PA decisions honored;
+  - exceptions granted under § 4.3;
+  - denials and member appeals.
+
+
+§ 5.0 — Denial and Appeal Procedures
+
+§ 5.1 — Denial of Continuity Request
+
+If the clinical review team determines that a prior plan PA decision
+will not be honored, the member receives a written denial letter
+within ten (10) business days. The letter explains the reason for
+denial and outlines appeal rights under 42 CFR § 422.566.
+
+§ 5.2 — Standard Appeal
+
+Members may file a standard appeal within sixty (60) days of the
+denial letter. Acme's appeals team renders a decision within
+thirty (30) days.
+
+§ 5.3 — Expedited Appeal
+
+In urgent cases, members or providers may request an expedited
+appeal. Acme renders an expedited decision within seventy-two (72)
+hours of receipt.
+
+
+§ 6.0 — Roles and Responsibilities
+
+  - Member Services: identifies transitioning members at enrollment.
+  - Utilization Management: reviews prior plan PA documentation.
+  - Clinical Review Team: makes continuity decisions.
+  - Appeals & Grievances: processes denials and appeals.
+  - Compliance Committee: reviews annual report and metrics.
+
+
+KNOWN GAPS (internal note, not part of policy)
+
+The Compliance team is aware of the following items requiring
+review against current CMS guidance:
+  - § 4.2 thirty-day window may need extension based on CMS-4201
+    Final Rule.
+  - § 4.5 annual reporting cadence is under review against the
+    Final Rule's quarterly requirement.
+  - § 4.3 exception scope is currently limited to oncology and
+    may need broader treatment-plan language.

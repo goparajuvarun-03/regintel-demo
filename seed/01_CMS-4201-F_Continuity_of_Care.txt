@@ -1,0 +1,132 @@
+CMS-4201-F · MEDICARE ADVANTAGE CONTINUITY OF CARE FINAL RULE
+Issuing body: Centers for Medicare & Medicaid Services (CMS)
+Regulation ID: CMS-4201-F
+Effective date: 2026-01-15
+Status: Final Rule
+Publication: Federal Register, Vol. 90, No. 215
+
+
+§ 1.0 — Purpose
+
+This Final Rule establishes minimum standards for continuity of care
+when Medicare Advantage (MA) enrollees transition between MA
+organizations or from Original Medicare. The Rule replaces and
+extends the previously published Proposed Rule (CMS-4201-P, March 2025).
+
+
+§ 2.0 — Scope
+
+This Rule applies to all Medicare Advantage organizations, Special
+Needs Plans (SNPs), and Medicare-Medicaid Plans (MMPs) operating
+under Part C of the Social Security Act. It is binding on contract
+year 2026 and forward.
+
+
+§ 3.0 — Definitions
+
+(a) "Transitioning member" means a Medicare Advantage enrollee whose
+plan-of-record changes due to election, disenrollment, special
+enrollment period, or annual coordinated election period.
+
+(b) "Prior plan PA decision" means a prior authorization determination
+made by the member's previous MA organization, Original Medicare
+fee-for-service contractor, or Medicaid managed care plan.
+
+(c) "Clinically established treatment plan" means a documented course
+of treatment ordered by a qualified clinician and supported by a
+diagnosis recorded in the member's medical record at the time of
+transition.
+
+
+§ 4.0 — Continuity Window Requirements
+
+§ 4.1 — General Standard
+
+Every Medicare Advantage organization shall honor prior plan PA
+decisions for transitioning members under the requirements of this
+section. Honoring a prior plan PA decision means accepting the
+clinical determination without requiring resubmission, additional
+documentation, or step-therapy reapplication.
+
+§ 4.2 — Minimum Window
+
+A Medicare Advantage organization shall honor prior plan PA decisions
+for a period of NOT LESS THAN ninety (90) days following the member's
+effective enrollment date with the receiving plan.
+
+NOTE: This requirement expands the proposed thirty (30) day window
+published in CMS-4201-P. CMS finds that ninety (90) days better
+protects enrollee continuity during transitions while remaining
+operationally feasible.
+
+§ 4.3 — Clinically Established Treatment Plans
+
+Where a member is undergoing a clinically established treatment plan
+at the time of transition, the receiving MA organization shall honor
+the prior plan PA decision for the FULL DURATION of that treatment
+plan, regardless of the ninety (90) day minimum window in § 4.2.
+
+For chronic conditions requiring ongoing therapy (oncology,
+nephrology, behavioral health, post-surgical rehabilitation), the
+receiving plan shall not require reassessment until the originally
+prescribed end-date of the treatment plan.
+
+
+§ 5.0 — Denial Standards
+
+§ 5.1 — Denial Notice Requirement
+
+If the receiving MA organization determines that a prior plan PA
+decision shall not be honored (for example, because the underlying
+service is not a covered benefit), the organization shall issue a
+written denial notice to the member within five (5) business days.
+
+§ 5.2 — Required Content of Denial Notice
+
+The denial notice shall include:
+  (i) the specific clinical and administrative basis for the denial;
+  (ii) the right to appeal under 42 CFR § 422.566;
+  (iii) the procedure for filing an expedited appeal;
+  (iv) contact information for the State Health Insurance
+       Assistance Program (SHIP) and Medicare ombudsman.
+
+§ 5.3 — Appeal Rights
+
+Members denied continuity-of-care coverage under this Rule shall have
+the right to file an expedited appeal within seventy-two (72) hours
+of receiving the denial notice. The MA organization shall render an
+appeal decision within seventy-two (72) hours of receipt.
+
+
+§ 6.0 — Reporting
+
+§ 6.1 — Quarterly Compliance Report
+
+Each Medicare Advantage organization shall submit a quarterly
+compliance report to CMS using the prescribed CMS template within
+thirty (30) calendar days of the close of each calendar quarter.
+
+NOTE: The Proposed Rule required annual reporting. The Final Rule
+moves to quarterly to enable closer CMS oversight.
+
+§ 6.2 — Required Data Elements
+
+The quarterly report shall contain, at minimum:
+  (i) total transitioning members during the reporting period;
+  (ii) total prior plan PA decisions honored;
+  (iii) total denials issued and reasons;
+  (iv) appeal volume and disposition;
+  (v) clinically established treatment plans extended beyond
+      ninety (90) days, by clinical category.
+
+
+§ 7.0 — Enforcement
+
+Failure to comply with this Rule may result in:
+  (a) civil monetary penalty under 42 CFR § 422.752 up to $25,000
+      per occurrence;
+  (b) corrective action plan with quarterly attestations to CMS;
+  (c) intermediate sanctions including suspension of new
+      enrollments under 42 CFR § 422.752(c)(1);
+  (d) referral to the HHS Office of Inspector General where
+      pattern violations indicate program abuse.
