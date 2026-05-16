@@ -87,6 +87,8 @@ def _secret(key: str, default: str = "") -> str:
 LLM_PROVIDER   = _secret("LLM_PROVIDER", "mock").lower()
 GEMINI_API_KEY = _secret("GEMINI_API_KEY")
 GEMINI_MODEL   = _secret("GEMINI_MODEL", "gemini-2.5-flash-lite")
+GROQ_API_KEY   = _secret("GROQ_API_KEY")
+GROQ_MODEL     = _secret("GROQ_MODEL", "llama-3.3-70b-versatile")
 GITHUB_TOKEN   = _secret("GITHUB_TOKEN")
 GITHUB_REPO    = _secret("GITHUB_REPO")  # format: "owner/repo"
 
@@ -590,9 +592,81 @@ def _strip_json_fence(s: str) -> str:
 
 
 def call_llm(system: str, user: str, max_tokens: int = 1500) -> dict:
-    """Returns a JSON dict. Falls back to mock if Gemini unavailable.
-    Sets _LAST_LLM_SOURCE so the UI can show which model actually responded."""
+    """Returns a JSON dict. Falls back to mock if the configured provider is unavailable.
+    Sets _LAST_LLM_SOURCE so the UI can show which model actually responded.
+    Supported providers (set LLM_PROVIDER secret): gemini | groq | mock."""
     global _LAST_LLM_SOURCE
+
+    # ─────────── Groq (OpenAI-compatible API, free tier, fast LPU hardware) ───────────
+    if LLM_PROVIDER == "groq" and GROQ_API_KEY:
+        try:
+            # Use the openai SDK pointed at Groq's OpenAI-compatible endpoint.
+            # If the openai package isn't installed, fall back to a plain urllib POST.
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=GROQ_API_KEY,
+                                base_url="https://api.groq.com/openai/v1")
+                resp = client.chat.completions.create(
+                    model=GROQ_MODEL,
+                    messages=[
+                        {"role": "system",
+                         "content": system + "\n\nReturn ONLY valid JSON. No markdown, no preamble."},
+                        {"role": "user", "content": user},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.2,
+                    max_tokens=max_tokens,
+                )
+                raw = (resp.choices[0].message.content or "").strip()
+            except ImportError:
+                # Fallback: plain urllib POST to Groq's chat-completions endpoint
+                import urllib.request
+                payload = json.dumps({
+                    "model": GROQ_MODEL,
+                    "messages": [
+                        {"role": "system",
+                         "content": system + "\n\nReturn ONLY valid JSON. No markdown."},
+                        {"role": "user", "content": user},
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.2,
+                    "max_tokens": max_tokens,
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    data=payload,
+                    headers={
+                        "Authorization": f"Bearer {GROQ_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                raw = body.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+            if not raw:
+                raise ValueError("Groq returned empty response")
+            cleaned = _strip_json_fence(raw)
+            try:
+                parsed = json.loads(cleaned)
+            except json.JSONDecodeError:
+                brace_start = cleaned.find("{")
+                brace_end = cleaned.rfind("}")
+                if brace_start >= 0 and brace_end > brace_start:
+                    parsed = json.loads(cleaned[brace_start:brace_end + 1])
+                else:
+                    raise
+            _LAST_LLM_SOURCE = {"source": "groq", "error": None, "model": GROQ_MODEL}
+            return parsed
+        except Exception as e:
+            err_msg = f"{type(e).__name__}: {str(e)[:200]}"
+            logger.warning("Groq call failed, using mock: %s", err_msg)
+            _LAST_LLM_SOURCE = {"source": "mock", "error": err_msg,
+                               "model": f"mock (Groq fallback after error)"}
+            return _mock_llm(system, user)
+
+    # ─────────── Gemini (Google AI Studio) ───────────
     if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
         try:
             import google.generativeai as genai
@@ -633,7 +707,8 @@ def call_llm(system: str, user: str, max_tokens: int = 1500) -> dict:
             _LAST_LLM_SOURCE = {"source": "mock", "error": err_msg, "model": "mock"}
             return _mock_llm(system, user)
 
-    _LAST_LLM_SOURCE = {"source": "mock", "error": None, "model": "mock (LLM_PROVIDER not set to gemini, or key missing)"}
+    _LAST_LLM_SOURCE = {"source": "mock", "error": None,
+                       "model": f"mock (LLM_PROVIDER={LLM_PROVIDER}, no valid key)"}
     return _mock_llm(system, user)
 
 
@@ -2004,8 +2079,12 @@ if cloud_is_configured():
         else:
             st.sidebar.error(f"Failed: {str(r.get('error', ''))[:60]}")
 
-# LLM mode info
-if LLM_PROVIDER == "mock" or not GEMINI_API_KEY:
+# LLM mode info — runs in mock only if no valid provider key is configured
+_using_real_llm = (
+    (LLM_PROVIDER == "gemini" and GEMINI_API_KEY) or
+    (LLM_PROVIDER == "groq" and GROQ_API_KEY)
+)
+if not _using_real_llm:
     st.sidebar.markdown(
         '<div style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:8px;">'
         'ℹ️ Running in mock LLM mode</div>', unsafe_allow_html=True)
@@ -2705,6 +2784,11 @@ def page_impact():
                         badge_border = "#2F7A3E"
                         badge_color = "#1a4a23"
                         badge_text = f"✓ Generated by Gemini ({_esc(llm_model)})"
+                    elif llm_src == "groq":
+                        badge_bg = "#E8F4F8"
+                        badge_border = "#028090"
+                        badge_color = "#0a5961"
+                        badge_text = f"✓ Generated by Groq ({_esc(llm_model)}) · open-source Llama on LPU hardware"
                     elif llm_src == "mock" and llm_err:
                         badge_bg = "#FBE7EC"
                         badge_border = "#B8294A"
