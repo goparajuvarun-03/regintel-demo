@@ -1295,37 +1295,72 @@ STRICT RULES FOR old_text AND new_text:
 #   1. LLM call to draft the language-change section (the part the AI is uniquely good at)
 #   2. python-docx assembly using analysis data + LLM output + sane defaults
 
-def _find_matching_internal_doc(impacted_area_name: str) -> dict | None:
+def _find_matching_internal_doc(impacted_area_name: str,
+                                  impacted_area_type: str | None = None) -> dict | None:
     """Find an uploaded internal artifact whose title best matches the given name.
-    Returns the document row (with doc_id, title, kind) or None if no match."""
+    When impacted_area_type is provided, ONLY consider documents whose kind matches the type
+    (Policy → policy, Workflow → sop, System → system). This prevents the matcher from
+    cross-mapping a "Prior Authorization System" impact to a "Prior Authorization Continuity
+    Policy" document just because they share the words "Prior Authorization".
+
+    Returns the document row (with doc_id, title, kind) or None if no good match."""
     if not impacted_area_name:
         return None
     target = impacted_area_name.strip().lower()
-    # Search across all non-regulation document kinds
+
+    # Map impacted-area type → uploaded-document kind(s)
+    type_to_kinds = {
+        "policy":   ("policy",),
+        "workflow": ("sop", "workflow"),
+        "sop":      ("sop", "workflow"),
+        "system":   ("system",),
+    }
+    if impacted_area_type:
+        kinds = type_to_kinds.get(impacted_area_type.strip().lower(), ())
+    else:
+        # If type is unknown, allow all kinds (legacy behaviour)
+        kinds = ("policy", "sop", "system", "workflow")
+
     candidates: list[dict] = []
-    for kind in ("policy", "sop", "system", "workflow"):
+    for kind in kinds:
         candidates.extend(db_list_documents(kind=kind))
 
     if not candidates:
         return None
 
-    # Exact title match (case-insensitive)
+    # Exact title match (case-insensitive) within the kind-filtered set
     for d in candidates:
         if d.get("title", "").strip().lower() == target:
             return d
 
-    # Substring match in either direction
+    # Word-overlap match with HIGHER threshold and proportional requirement.
+    # The match must cover ≥50% of the target's significant words to count.
+    # Drop common filler words from the comparison.
+    STOP = {"the", "a", "an", "of", "for", "to", "and", "or",
+            "prior", "current", "internal", "core"}
+    def sig(words: set[str]) -> set[str]:
+        return {w for w in words if w not in STOP and len(w) > 2}
+
+    target_sig = sig(set(re.findall(r"\w+", target)))
+    if not target_sig:
+        return None  # nothing to match against
+
     best = None
-    best_score = 0
-    target_words = set(re.findall(r"\w+", target))
+    best_score = 0.0
     for d in candidates:
         title = d.get("title", "").strip().lower()
-        title_words = set(re.findall(r"\w+", title))
-        overlap = len(target_words & title_words)
-        # Require at least 2 word overlap to claim a match
-        if overlap >= 2 and overlap > best_score:
+        title_sig = sig(set(re.findall(r"\w+", title)))
+        if not title_sig:
+            continue
+        overlap = len(target_sig & title_sig)
+        # Score = harmonic-mean-like ratio so both sides must overlap proportionally
+        coverage_target = overlap / len(target_sig)
+        coverage_title  = overlap / len(title_sig)
+        score = (coverage_target + coverage_title) / 2
+        # Require at least 50% mean coverage to claim a match
+        if score >= 0.5 and score > best_score:
             best = d
-            best_score = overlap
+            best_score = score
     return best
 
 
@@ -1357,7 +1392,10 @@ def generate_proposed_text(regulation_doc: dict, analysis_result: dict,
     Falls back to safe defaults on failure."""
 
     # Step 1: try to find the actual uploaded internal artifact
-    matched_doc = _find_matching_internal_doc(impacted_area.get("name", ""))
+    matched_doc = _find_matching_internal_doc(
+        impacted_area.get("name", ""),
+        impacted_area.get("type", ""),
+    )
 
     # Step 2: if found, retrieve the chunks most relevant to the gap description
     artifact_chunks: list[dict] = []
@@ -1397,22 +1435,31 @@ ACTUAL CURRENT TEXT FROM THE INTERNAL ARTIFACT (top retrieved sections):
 
 TASK
 Return a JSON object with EXACTLY these four keys. Your response MUST be grounded in the
-actual current text above — do not invent or paraphrase.
+actual current text above — do not invent or paraphrase current_text_verbatim.
 
-- current_text_verbatim: a VERBATIM quote (1-3 sentences) copied EXACTLY from the artifact text above. This is the specific sentence that must be replaced to comply with the regulation. Copy character-for-character including punctuation, capitalization, and section markers. If multiple passages must change, pick the single most central one.
+- current_text_verbatim: a VERBATIM quote (1-3 sentences) copied EXACTLY from the artifact text above. This is the specific sentence that must be REPLACED to comply with the regulation. Copy character-for-character including punctuation, capitalization, and section markers. If multiple passages must change, pick the single most central one.
 
 - source_section: the section identifier from the chunk you quoted (e.g. "§ 4.2" or "STEP 3" or "—" if no section was tagged).
 
-- proposed_text: 2-4 sentences of revised {impacted_area.get('type', 'policy')}-style language that will replace the verbatim text above. Write the prose AS IT WOULD APPEAR in the document itself — do not use framing like "We propose..." This MUST be specific to the artifact "{impacted_area.get('name', '')}" and the specific gap.
+- proposed_text: REWRITTEN {impacted_area.get('type', 'policy')}-language that REPLACES current_text_verbatim. This is a 2-4 sentence REWRITE — not a copy, not a paraphrase, not the same text. The proposed_text must be SUBSTANTIVELY DIFFERENT from current_text_verbatim because they are before/after versions of the same passage. If the regulation requires changing "30 days" to "90 days", then current_text_verbatim contains "30 days" and proposed_text contains "90 days". Write the prose AS IT WOULD APPEAR in the document — no framing words like "we propose" or "should be updated to". Make it specific to "{impacted_area.get('name', '')}" and the gap.
 
-- rationale: 1-2 sentences explaining why this exact wording is required, citing the regulation section explicitly (e.g. "Required per {regulation_doc.get('regulation_id', 'the regulation')} § XYZ").
+- rationale: 1-2 sentences explaining WHY the new wording is required, citing the regulation section explicitly (e.g. "Required per {regulation_doc.get('regulation_id', 'the regulation')} § XYZ").
 
 - section_reference: the specific regulation section that mandates this change (e.g. "§ 422.138(b)" or "42 CFR § 422.752"). Single string.
 
-IMPORTANT
-- current_text_verbatim MUST be copied character-for-character from the artifact text above. Do not summarize, paraphrase, or improve the wording. Do not add ellipsis. Pick a contiguous passage.
-- If none of the artifact text above conflicts with the regulation, return current_text_verbatim as "" and set source_section to "".
-- proposed_text must read as final policy/SOP/system prose, not as a memo about a policy.
+WORKED EXAMPLE (for shape only — not your task):
+If the artifact says "Plans shall honor prior PA decisions for thirty (30) days" and the
+regulation requires 90 days, a correct response is:
+  current_text_verbatim: "Plans shall honor prior PA decisions for thirty (30) days"
+  proposed_text: "Plans shall honor prior authorization decisions made by the previous Medicare Advantage organization for a minimum of ninety (90) days following the member's enrollment date, and for the full duration of any clinically established treatment plan, whichever is longer."
+Note how the proposed_text contains the FIXED VERSION of the same passage with the
+regulation-mandated language baked in. They are NOT the same string.
+
+CRITICAL VALIDATION:
+- current_text_verbatim MUST be copied character-for-character from the artifact text above.
+- proposed_text MUST NOT be identical to current_text_verbatim. If they would be the same, you have not written a fix — try again. The proposed_text is the AFTER, current_text_verbatim is the BEFORE.
+- proposed_text MUST read as final policy/SOP/system prose, not as a memo about a policy.
+- If none of the artifact text above conflicts with the regulation, return current_text_verbatim as "" and proposed_text as a brief note explaining no change is required.
 """
     else:
         # No internal document uploaded → fall back to inferred-current-text mode, with honest label
@@ -1457,17 +1504,51 @@ Return a JSON object with EXACTLY these four keys:
         )
         current_verbatim = str(result.get("current_text_verbatim") or "").strip()
         source_section = str(result.get("source_section") or "").strip()
+        proposed_text  = str(result.get("proposed_text") or "").strip()
 
         # If we promised verbatim but got nothing, fall back to inferred mode in the response
         if has_verbatim_source and not current_verbatim:
             has_verbatim_source = False  # downgrade the label
 
+        # Detect the "parroted output" failure mode: LLM returned proposed_text that's
+        # identical or near-identical to current_text_verbatim. This is a real failure
+        # — they should be the BEFORE and AFTER of a change, not the same string.
+        proposed_identical_to_current = False
+        if current_verbatim and proposed_text:
+            # Strip whitespace and case-normalize for comparison
+            cv_norm = " ".join(current_verbatim.split()).lower()
+            pt_norm = " ".join(proposed_text.split()).lower()
+            if cv_norm == pt_norm:
+                proposed_identical_to_current = True
+            elif len(cv_norm) > 30 and (cv_norm in pt_norm or pt_norm in cv_norm):
+                # One is substring of the other AND there's a long overlap → parroted
+                proposed_identical_to_current = True
+            else:
+                # Token-overlap check: if 80%+ of words overlap, treat as parroted
+                cv_words = set(cv_norm.split())
+                pt_words = set(pt_norm.split())
+                if cv_words and pt_words:
+                    overlap_ratio = len(cv_words & pt_words) / min(len(cv_words), len(pt_words))
+                    if overlap_ratio >= 0.85:
+                        proposed_identical_to_current = True
+
+        if proposed_identical_to_current:
+            logger.warning(
+                "LLM returned identical current/proposed text — flagging as needs-rewrite"
+            )
+            proposed_text = (
+                "[AI returned text identical to the current passage instead of writing a "
+                "compliant rewrite. Click 'Regenerate proposed text' to retry, or have the "
+                "analyst draft the replacement language manually based on the regulation "
+                "and the gap description.]"
+            )
+
         return {
             "current_text_assumption": current_verbatim or
                 "[Verify current text in the affected artifact before applying changes.]",
-            "proposed_text": str(result.get("proposed_text") or
+            "proposed_text": proposed_text or
                 impacted_area.get("recommended_action") or
-                "[AI-drafted language unavailable. Analyst to draft compliant replacement text.]"),
+                "[AI-drafted language unavailable. Analyst to draft compliant replacement text.]",
             "rationale": str(result.get("rationale") or
                 f"Required by {regulation_doc.get('regulation_id') or regulation_doc.get('title')}."),
             "section_reference": str(result.get("section_reference") or
@@ -1477,6 +1558,10 @@ Return a JSON object with EXACTLY these four keys:
             "source_section": source_section if has_verbatim_source else None,
             "source_artifact_title": matched_doc.get("title") if matched_doc else None,
             "llm_source": dict(_LAST_LLM_SOURCE),  # which LLM actually responded
+            "validation_warning": (
+                "Output rejected: proposed_text was identical to current_text_verbatim."
+                if proposed_identical_to_current else None
+            ),
         }
     except Exception as e:
         logger.exception("Proposed-text generation failed: %s", e)
@@ -2771,6 +2856,21 @@ def page_impact():
                         f"font-weight:600; margin-bottom:14px;'>"
                         f"{_esc(draft['section_reference'])}"
                         f"</div>", unsafe_allow_html=True)
+
+                    # Validation warning — surfaced if the LLM returned proposed_text
+                    # that's identical/near-identical to current_text_verbatim.
+                    val_warn = draft.get("validation_warning")
+                    if val_warn:
+                        st.markdown(
+                            f"<div style='background:#FBE7EC; padding:10px 14px; "
+                            f"border-radius:6px; border-left:3px solid #B8294A; "
+                            f"font-size:12px; color:#7A1A33; margin:10px 0;'>"
+                            f"⚠ <b>AI output flagged:</b> The LLM returned a proposed_text "
+                            f"that was substantively identical to the current text — this is "
+                            f"not a valid remediation. Click <b>Regenerate proposed text</b> below "
+                            f"to retry. If it persists across retries, the analyst should draft "
+                            f"the replacement language manually."
+                            f"</div>", unsafe_allow_html=True)
 
                     # LLM source badge — tells the user WHICH model actually produced
                     # this draft. Critical for trust: "Gemini Flash-Lite" vs "Mock fallback"
